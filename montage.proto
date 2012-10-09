@@ -1,0 +1,111 @@
+enum MontageWireMessages {
+    MONTAGE_GET = 1;
+    MONTAGE_GET_REFERENCE = 2;
+    MONTAGE_GET_RESPONSE = 3;
+    MONTAGE_COMMAND = 4;
+    MONTAGE_COMMAND_RESPONSE = 5;
+    MONTAGE_PUT = 6;
+    MONTAGE_PUT_RESPONSE = 7;
+    MONTAGE_GET_MANY = 8;
+    MONTAGE_SET_REFERENCE = 9;
+    MONTAGE_PUT_MANY = 10;
+    MONTAGE_PUT_MANY_RESPONSE = 11;
+    MONTAGE_ERROR = 12;
+    MONTAGE_DELETE = 13;
+    MONTAGE_DELETE_RESPONSE = 14;
+}
+
+message MontageSubrequestSpec {
+    required bytes sub_spec = 1;
+    optional bytes params = 2;
+}
+
+message MontageGet {
+    required bytes bucket = 1;
+    required bytes key = 2;
+    optional MontageSubrequestSpec sub = 3;
+}
+
+message MontageGetMany {
+    /* note: will not execute subrequests!
+       master document will be None on
+       MontageGetResponse */
+    repeated MontageGet gets = 1;
+}
+
+message MontageGetReference {
+    required bytes bucket = 1;
+    required bytes key = 2;
+    required bytes target_bucket = 3;
+    optional MontageSubrequestSpec sub = 4;
+}
+
+message MontageSetReference {
+    required bytes bucket = 1;
+    required bytes key = 2;
+    required bytes target_key = 3;
+}
+
+enum MontageGetStatus {
+    EXISTS = 1;
+    MISSING = 2;
+    ERROR = 3;
+}
+
+message MontageObject {
+    optional bytes vclock = 1;
+    required bytes bucket = 2;
+    required bytes key = 3;
+    required bytes data = 4;
+    optional uint32 fetch_resolutions = 5; // informative
+}
+
+message MontageGetResponse {
+    repeated MontageGetStatus status = 1;
+    optional MontageObject master = 2; // optional b/c missing
+    repeated MontageObject subs = 3;
+}
+
+message MontageCommand {
+    required string command = 1;
+    optional bytes argument = 2;
+}
+
+message MontageCommandResponse {
+    required string status = 1;
+    optional bytes value = 2;
+}
+
+message MontagePut {
+    required MontageObject object = 1;
+}
+
+message MontagePutResponse {
+    required bool modified = 1;
+    required MontageObject object = 2; /* with siblings set */
+}
+
+message MontagePutMany {
+    repeated MontageObject objects = 1;
+}
+
+message MontagePutManyResponse {
+    repeated MontagePutResponse objects = 1;
+}
+
+message MontageDelete {
+    required bytes bucket = 1;
+    required bytes key = 2;
+}
+
+message MontageDeleteResponse {}
+
+message MontageError {
+    required string error = 1;
+}
+
+message MontageEnvelope {
+    required MontageWireMessages mtype = 1;
+    required bytes msg = 2;
+    optional bytes msgid = 3;
+}

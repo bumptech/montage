@@ -1,0 +1,78 @@
+Name:                montage
+Version:             0.1
+Synopsis:            Riak Resolution Proxy
+Homepage:            http://github.com/bumptech/montage
+License:             BSD3
+License-file:        LICENSE
+Author:              Bump Technologies, Inc
+Maintainer:          dev@bu.mp
+Category:            Network
+Build-type:          Simple
+Cabal-version:       >=1.8
+
+Library
+  Exposed-modules:     Network.Riak.Montage,
+                       Network.Riak.Montage.Backend,
+                       Network.Riak.Montage.Commands,
+                       Network.Riak.Montage.Main,
+                       Network.Riak.Montage.Process,
+                       Network.Riak.Montage.Protocol,
+                       Network.Riak.Montage.Types,
+                       Network.Riak.Montage.Util,
+                       Network.Riak.Montage.Proto.Montage
+                       Network.Riak.Montage.Proto.Montage.MontageCommand
+                       Network.Riak.Montage.Proto.Montage.MontageCommandResponse
+                       Network.Riak.Montage.Proto.Montage.MontageDelete
+                       Network.Riak.Montage.Proto.Montage.MontageDeleteResponse
+                       Network.Riak.Montage.Proto.Montage.MontageEnvelope
+                       Network.Riak.Montage.Proto.Montage.MontageError
+                       Network.Riak.Montage.Proto.Montage.MontageGet
+                       Network.Riak.Montage.Proto.Montage.MontageGetMany
+                       Network.Riak.Montage.Proto.Montage.MontageGetReference
+                       Network.Riak.Montage.Proto.Montage.MontageGetResponse
+                       Network.Riak.Montage.Proto.Montage.MontageGetStatus
+                       Network.Riak.Montage.Proto.Montage.MontageObject
+                       Network.Riak.Montage.Proto.Montage.MontagePut
+                       Network.Riak.Montage.Proto.Montage.MontagePutMany
+                       Network.Riak.Montage.Proto.Montage.MontagePutManyResponse
+                       Network.Riak.Montage.Proto.Montage.MontagePutResponse
+                       Network.Riak.Montage.Proto.Montage.MontageSetReference
+                       Network.Riak.Montage.Proto.Montage.MontageSubrequestSpec
+                       Network.Riak.Montage.Proto.Montage.MontageWireMessages
+
+  -- Packages needed in order to build this package.
+  Build-depends:  base >= 4 && < 5,
+                  bytestring>=0.9,
+                  mtl>=2.0 && < 2.2,
+                  time>=1.2,
+                  old-locale,
+                  containers,
+                  binary>=0.5,
+                  system-uuid>=2,
+                  aeson>=0.3,
+                  hex>=0.1,
+                  text>=0.11,
+                  stm>=2.2,
+                  attoparsec>=0.8,
+                  blaze-builder>=0.3,
+                  attoparsec-binary>0.1 && < 0.2,
+                  random>=1.0,
+                  QuickCheck>=2 && <3,
+                  ListLike,
+                  riak-bump>=0.7.3.4,
+                  pool-conduit>=0.1.0.2&&<0.2,
+                  monad-control < 0.4,
+                  unordered-containers >= 0.2.1 && < 0.3,
+                  zeromq-haskell>=0.8 && < 0.9,
+                  transformers>=0.2.2.0,
+                  protocol-buffers == 2.0.11,
+                  protocol-buffers-descriptor == 2.0.11,
+                  stats-web,
+                  safe
+
+  Extensions: OverloadedStrings,DeriveDataTypeable
+  Extensions: FlexibleInstances,DoAndIfThenElse,ScopedTypeVariables
+  Extensions: BangPatterns,GADTs,MultiParamTypeClasses,FunctionalDependencies
+  Extensions: RankNTypes,FlexibleContexts,OverlappingInstances,TupleSections
+
+  Ghc-Options: -O2 -threaded -rtsopts -funfolding-use-threshold=16 -fexcess-precision -feager-blackholing
