@@ -60,8 +60,12 @@ instance (MontageRiakValue a) => V.IsContent (RiakRecord a) where
 
     toContent = C.binary . riakSerialize
 
+showRiakRecord b v = "(buck=" ++ show b ++ ", val=" ++ show v ++ ")"
+
 instance (MontageRiakValue a) => Show (RiakRecord a) where
-    show = undefined
+    show (RiakMontageLazyBs b v) = showRiakRecord b v
+    show (RiakMontagePb b v) = showRiakRecord b v
+    show (RiakMontageReference b v) = showRiakRecord b v
 
 data PoolSpec = PoolA -- bam etc, ssd
               | PoolB -- boss, slower
