@@ -5,19 +5,12 @@ import Text.ProtocolBuffers.WireMessage (Wire)
 import Text.ProtocolBuffers.Reflections (ReflectDescriptor)
 import Network.Riak.Montage.Proto.Montage.MontageSubrequestSpec
 import Network.Riak.Montage.Proto.Montage.MontageObject
-import Data.Word (Word32)
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
-import qualified Data.Sequence as Seq
-import Data.Maybe (fromMaybe, Maybe)
-import Data.Aeson.Types (Result(..))
 import qualified Data.Text as T
 import Network.Riak.Types
-import Network.Riak (Client(..))
 import Data.Conduit.Pool (Pool)
-import Control.Monad.Reader (ReaderT)
-import qualified Data.Map as M
-import Control.Concurrent.STM (TVar(..))
+import GHC.Int (Int64)
 
 import Network.Riak (Resolvable(..))
 import qualified Network.Riak.Value as V
@@ -40,26 +33,28 @@ class (Show a) => MontageRiakValue a where
     ensureEval _ = error "non lazy or pb passed to pb `eval`"
 
 instance (MontageRiakValue a) => Resolvable (RiakRecord a) where
-    resolve r1@(RiakMontageReference _ _) r2@(RiakMontageReference _ _) = r1
+    resolve r1@(RiakMontageReference _ _) (RiakMontageReference _ _) = r1
 
     -- force deserialization for resolution
-    resolve r1@(RiakMontageLazyBs b s1) r2 =
-        resolve (ensureEval r1) r2
-    resolve r1 r2@(RiakMontageLazyBs b s2) =
-        resolve r1 (ensureEval r2)
+    resolve r1@(RiakMontageLazyBs _ _) r2 = resolve (ensureEval r1) r2
+    resolve r1 r2@(RiakMontageLazyBs _ _) = resolve r1 (ensureEval r2)
 
-    resolve r1@(RiakMontagePb b o1) r2@(RiakMontagePb _ o2) = RiakMontagePb b $ (pbResolve $ getPB b) o1 o2
-    resolve r1 r2 = error "no resolution code for record type, wtfbbq?"
+    resolve (RiakMontagePb b o1) (RiakMontagePb _ o2) = RiakMontagePb b $ (pbResolve $ getPB b) o1 o2
+    resolve _ _  = error "no resolution code for record type, wtfbbq?"
 
+refPfx :: L.ByteString
 refPfx = "reference-"
+
+rlen :: Int64
 rlen = L.length refPfx
 
 instance (MontageRiakValue a) => V.IsContent (RiakRecord a) where
-    parseContent bucket c | L.take rlen bucket == refPfx = return $ RiakMontageReference bucket $ C.value c
-                          | otherwise                    = return $ RiakMontageLazyBs bucket $ C.value c
+    parseContent buck c | L.take rlen buck == refPfx = return $ RiakMontageReference buck $ C.value c
+                          | otherwise                    = return $ RiakMontageLazyBs buck $ C.value c
 
     toContent = C.binary . riakSerialize
 
+showRiakRecord :: (Show a, Show b) => a -> b -> [Char]
 showRiakRecord b v = "(buck=" ++ show b ++ ", val=" ++ show v ++ ")"
 
 instance (MontageRiakValue a) => Show (RiakRecord a) where

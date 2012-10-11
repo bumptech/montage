@@ -75,4 +75,4 @@ Library
   Extensions: BangPatterns,GADTs,MultiParamTypeClasses,FunctionalDependencies
   Extensions: RankNTypes,FlexibleContexts,OverlappingInstances,TupleSections
 
-  Ghc-Options: -O2 -threaded -rtsopts -funfolding-use-threshold=16 -fexcess-precision -feager-blackholing
+  Ghc-Options: -Wall -O2 -threaded -rtsopts -funfolding-use-threshold=16 -fexcess-precision -feager-blackholing

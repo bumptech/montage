@@ -1,45 +1,16 @@
 module Network.Riak.Montage.Commands where
 
 import Network.Riak.Montage.Proto.Montage.MontageWireMessages
-import Text.ProtocolBuffers.WireMessage (Wire, messagePut, messageGet)
-import Text.ProtocolBuffers.Basic (toUtf8, utf8)
-import Text.ProtocolBuffers.Reflections (ReflectDescriptor)
-import Data.Word (Word32)
-import Data.List (foldl', nub)
-import Data.Maybe (fromJust, fromMaybe, isNothing, isJust, catMaybes)
-import qualified Data.Set as Set
-import qualified Network.Riak.Content as C
+import Data.List (foldl')
+import Data.Maybe (fromMaybe)
 import qualified Network.Riak.Types as RT
 import qualified Data.Sequence as Seq
-import qualified Data.Foldable as Foldable
-import Data.Sequence ((<|))
-import Data.Function (on)
-import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
-import qualified Data.ListLike as LL
-import qualified Data.Aeson as AE
-import Data.Aeson (Value, encode, (.=))
-import Data.Bits (shiftL, (.|.))
-import Data.Binary.Put (runPut, putWord64le)
-import GHC.Word (Word32, Word64)
-import Text.Printf (printf)
 
-import Control.Arrow ((&&&))
-import Control.Monad (forM, forM_, when)
-import Control.Monad.Reader (asks)
-import Control.Applicative ((<$>))
-import Control.Monad.IO.Class (liftIO)
-import Control.Monad.Reader (ReaderT)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as E
-import Data.Hex (unhex, hex)
-import System.IO.Unsafe (unsafePerformIO)
-import Safe (fromJustNote)
-import Data.Char (ord, toLower)
 
 import Network.Riak.Types
 
-import Network.Riak.Montage.Proto.Montage.MontageObject
+import Network.Riak.Montage.Proto.Montage.MontageObject (MontageObject(MontageObject))
 import Network.Riak.Montage.Proto.Montage.MontageGetResponse
 import Network.Riak.Montage.Proto.Montage.MontagePutResponse
 import Network.Riak.Montage.Proto.Montage.MontagePutManyResponse
@@ -48,9 +19,7 @@ import Network.Riak.Montage.Proto.Montage.MontageSubrequestSpec as MSS
 import Network.Riak.Montage.Proto.Montage.MontageDeleteResponse
 
 import Network.Riak.Montage.Types
-import Network.Riak.Montage.Backend (doGet, doPut)
 
-import Debug.Trace (trace)
 
 makeObject :: (MontageRiakValue r) => L.ByteString -> L.ByteString -> (RiakRecord r, VClock, Maybe Int) -> MontageObject
 makeObject buck key (rec, vclock, resolutions) =
@@ -81,12 +50,14 @@ exec (ChainGet buck key msub mfollow) =
                                         ChainGetMany dosubs obj Nothing
             Nothing            -> ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
                 MontageGetResponse (Seq.fromList [MISSING]) Nothing Seq.empty
+    finishGet _ = error "Got unexpected value back from Riak"
 
 exec (ChainPut vclock buck key rec mcallback) =
     IterationRiakCommand [RiakPut vclock buck key rec] $ fromMaybe finishPut mcallback
   where
     finishPut :: (MontageRiakValue r) => [RiakResponse r] -> ChainCommand r
     finishPut (mres:[]) = ChainReturn $ ResponseProtobuf MONTAGE_PUT_RESPONSE $ makePutResponse buck key mres
+    finishPut _  = error "Got unexpected value back from Riak"
 
 exec (ChainPutMany reqs mcallback) =
     IterationRiakCommand [RiakPut vc b k r | (vc, b, k, r) <- reqs] $ fromMaybe finishPutMany mcallback
@@ -117,7 +88,7 @@ exec (ChainDelete buck key mcallback) =
     IterationRiakCommand [RiakDelete buck key] $ fromMaybe finishDelete mcallback
   where
     finishDelete :: (MontageRiakValue r) => [RiakResponse r] -> ChainCommand r
-    finishDelete resp@[Nothing] = ChainReturn $ ResponseProtobuf MONTAGE_DELETE_RESPONSE MontageDeleteResponse
+    finishDelete [Nothing] = ChainReturn $ ResponseProtobuf MONTAGE_DELETE_RESPONSE MontageDeleteResponse
     finishDelete _ = error "Delete should never return a result"
 
 exec (ChainReference ref key realBucket msub) =
@@ -127,10 +98,12 @@ exec (ChainReference ref key realBucket msub) =
     finishFollowRef :: (MontageRiakValue r) => [RiakResponse r] -> ChainCommand r
     finishFollowRef (r:[]) =
         case r of
-            Just (RiakMontageReference _ realKey, vc, _) -> ChainGet realBucket realKey msub Nothing
+            Just (RiakMontageReference _ realKey, _, _) -> ChainGet realBucket realKey msub Nothing
+            Just _ -> error "Reference not returned from reference fetch"
             Nothing ->
                 ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
                     MontageGetResponse Seq.empty Nothing Seq.empty
+    finishFollowRef _ = error "Unexpected result back from RiakGet"
 
 exec (ChainReferenceSet ref key realKey) =
     let fullbuck = L.concat [refPfx, ref] in
@@ -143,6 +116,7 @@ exec (ChainCustom cmd arg) = customCommandHandler cmd arg
 
 exec (ChainCommandIO cmd) = ChainIterationIO cmd
 
+exec (ChainSub _ _ _) = error "Cannot handle ChainSub commands"
 -- Finally...
 exec (ChainReturn resp) = IterationResponse resp
 

@@ -7,8 +7,8 @@ module Network.Riak.Montage
         RiakRecord(..),
         CommandResponse(..),
         ChainIteration(..),
-        RiakResponse(..),
-        RiakPool(..),
+        RiakResponse,
+        RiakPool,
         runDaemon,
         )
        where

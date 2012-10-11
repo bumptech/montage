@@ -8,7 +8,7 @@ import Control.Concurrent (threadDelay)
 import Data.Aeson (Value, (.=), object)
 
 import Data.Time.Clock (getCurrentTime)
-import Data.Time.Format (formatTime, buildTime)
+import Data.Time.Format (formatTime)
 import System.Locale (defaultTimeLocale)
 import System.IO (hPutStrLn, stderr)
 
