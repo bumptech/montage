@@ -1,13 +1,14 @@
 module Network.Riak.Montage.Backend where
 
 import Prelude hiding (catch)
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Exception (catch, throw, SomeException(..))
 import Control.Concurrent (threadDelay)
+import Data.ByteString.Lazy as L
 import Network.Riak.Types
 import Network.Riak.Value.Resolvable (getWithLength, put, delete)
 
-import Network.StatsWeb (Stats)
+import Network.StatsWeb (Stats, incCounter)
 
 import Network.Riak.Montage.Types
 import Data.Conduit.Pool (withResource)
@@ -38,9 +39,9 @@ doGet stats buck key riakPool = do
   res <- retryOperation $ withResource (riakPool buck) $ \c -> getWithLength c buck key Default
   case res of
     Just ((resolved, siblings), v) -> do
-        --let resolvedLength = L.length $ riakSerialize resolved
-        --when (siblings > 10) $ incCounter "requests.many.siblings" stats
-        --when (resolvedLength > 1097152) $ incCounter "requests.big" stats
+        let resolvedLength = L.length $ riakSerialize resolved
+        when (siblings > 10) $ incCounter "requests.many.siblings" stats
+        when (resolvedLength > 1097152) $ incCounter "requests.big" stats
         return $ Just (resolved, v, Just siblings)
     Nothing -> return Nothing
 
