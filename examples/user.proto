@@ -1,0 +1,4 @@
+message UserInfo {
+  required uint32 uid = 1;
+  optional string name = 2;
+}
