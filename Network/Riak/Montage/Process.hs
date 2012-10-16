@@ -188,7 +188,7 @@ processRequest state logger riakPool cmd stats = do
         Just count -> do
             logState count
             finally (runWithTimeout (processRequest' logger riakPool cmd stats)) decrCount
-        Nothing -> error "concurrency limit hit!" -- XXX return magic error
+        Nothing -> error "concurrency limit hit!" -- XXX return montage error
   where
     runWithTimeout actuallyRun = do
         mr <- timeout requestTimeout (pipelineGet state cmd actuallyRun)
@@ -196,7 +196,7 @@ processRequest state logger riakPool cmd stats = do
             Just r -> do
                 return r
             Nothing -> do
-                error "magicd request timeout!"
+                error "montage request timeout!"
 
     maybeIncrCount = atomically $ do
         count <- readTVar (concurrentCount state)

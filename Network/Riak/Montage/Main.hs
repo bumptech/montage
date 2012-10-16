@@ -11,8 +11,8 @@ import Network.Riak.Montage.Process (newEmptyConcurrentState)
 import Network.Riak.Montage.Types
 import Network.Riak.Montage.Util
 
-magicStats :: [T.Text]
-magicStats = [
+montageStats :: [T.Text]
+montageStats = [
     "pulse"
   , "requests"
   , "requests.slow"
@@ -26,7 +26,7 @@ sleepForever = forever $ threadDelay (1000000 * 3600)
 runDaemon :: (MontageRiakValue a) => LogCallback -> T.Text -> RiakPool -> a -> IO ()
 runDaemon logger prefix chooser crap = do
     stats <- initStats prefix
-    mapM_ (addCounter stats) magicStats
+    mapM_ (addCounter stats) montageStats
 
     state <- newEmptyConcurrentState
 
