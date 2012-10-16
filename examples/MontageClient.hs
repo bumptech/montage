@@ -28,6 +28,7 @@ import Network.Riak.Montage.Proto.Montage.MontageWireMessages
 import Network.Riak.Montage.Proto.Montage.MontageObject
 import Network.Riak.Montage.Proto.Montage.MontageEnvelope as ME
 import Network.Riak.Montage.Proto.Montage.MontageGet
+import Network.Riak.Montage.Proto.Montage.MontagePut
 import Network.Riak.Montage.Proto.Montage.MontageGetMany
 import Network.Riak.Montage.Proto.Montage.MontageGetResponse as MGR
 import Network.Riak.Montage.Proto.Montage.MontagePutResponse as MPR
@@ -83,14 +84,26 @@ montageGet pool buck key = do
           where msg = messageGetError "montageGet: MontageGetResponse" $ ME.msg res
         _                  -> formatThrow "Unknown response to MontageGet" () >> return Nothing
 
-montagePutMany :: MontagePool -> [MontageObject] -> IO [MontageObject]
+montagePut :: MontagePool -> MontageObject -> IO (Maybe MontageObject)
+montagePut pool os = do
+    uid <- fmap (B.pack . show) uuid
+    let req = messagePut $ MontageEnvelope MONTAGE_PUT (messagePut $ MontagePut os) (Just uid)
+    res <- montageRpc pool req
+    assertM (ME.msgid res == Just uid) "mismatched req/response!" ()
+    case ME.mtype res of
+        MONTAGE_PUT_RESPONSE -> return $ Just $ MPR.object $ messageGetError "montagePut: put" $ ME.msg res
+        MONTAGE_ERROR        -> formatThrow "Incorrect response to MontagePutMany: error={}" (Only $ uToString $ MErr.error msg) >> return Nothing
+          where msg = messageGetError "montagePut: MontagePutResponse" $ ME.msg res
+        _ -> formatThrow "Unknown response to MontagePut" () >> return Nothing
+
+montagePutMany :: MontagePool -> [MontageObject] -> IO (Maybe [MontageObject])
 montagePutMany pool os = do
     uid <- fmap (B.pack . show) uuid
     let req = messagePut $ MontageEnvelope MONTAGE_PUT_MANY (messagePut $ MontagePutMany $ Seq.fromList os) (Just uid)
     res <- montageRpc pool req
     assertM (ME.msgid res == Just uid) "mismatched req/response!" ()
     case ME.mtype res of
-        MONTAGE_PUT_MANY_RESPONSE -> return $ LL.map MPR.object $ MPMR.objects $ messageGetError "montagePutMany: put" $ ME.msg res
-        MONTAGE_ERROR        -> formatThrow "Incorrect response to MontagePutMany: error={}" (Only $ uToString $ MErr.error msg) >> return []
+        MONTAGE_PUT_MANY_RESPONSE -> return $ Just $ LL.map MPR.object $ MPMR.objects $ messageGetError "montagePutMany: put" $ ME.msg res
+        MONTAGE_ERROR        -> formatThrow "Incorrect response to MontagePutMany: error={}" (Only $ uToString $ MErr.error msg) >> return Nothing
           where msg = messageGetError "montagePutMany: MontageGetResponse" $ ME.msg res
-        _ -> formatThrow "Unknown response to MontagePutMany" () >> return []
+        _ -> formatThrow "Unknown response to MontagePutMany" () >> return Nothing

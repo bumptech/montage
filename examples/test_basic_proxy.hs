@@ -35,9 +35,9 @@ putDecimal i | i < 0     = BW.pack $ (45 :: Word8) : (reverse $ putDecimal' $ ab
 -- test client
 
 generateData :: (Int, Int) -> MontageObject
-generateData (key, uid) = MontageObject Nothing "u-name" key data' Nothing
+generateData (key, uid) = MontageObject Nothing "u-name" key' data' Nothing
   where
-    key = putDecimal $ fromIntegral uid
+    key' = putDecimal $ fromIntegral key
     data' = messagePut $ UserInfo { uid = fromIntegral uid
                                   , name = Nothing }
 
@@ -64,7 +64,9 @@ main = do
       Left (e :: SomeException) -> hPutStrLn stdout "This client fucked up"
       Right results -> do
         hPutStrLn stdout "\nput: "
-        mapM_ (\res -> hPutStrLn stdout $ show res) results
+        case results of
+            Just res -> mapM_ (\r -> hPutStrLn stdout $ show r) res
+            Nothing -> hPutStrLn stdout "Nothing put in riak"
 
   -- test get and resolution
   mr <- try $ montageGet montageZpool bucket (putDecimal key)
