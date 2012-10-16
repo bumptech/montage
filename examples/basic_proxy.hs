@@ -14,6 +14,7 @@ import Network.Riak.Montage
 import Network.Riak.Montage.Util
 
 import User.UserInfo
+import User.UserEvent
 
 -- Logging
 
@@ -36,10 +37,13 @@ chooseSinglePool pool = (\_ -> pool)
 
 -- Resolution logic
 {-
-  Here your data is a simple protocol buffer:
+  Here your data can be one of two simple protocol buffers:
     message UserInfo {
       required uint32 uid = 1;
-      optional string name = 2;
+    }
+
+    message UserEvent {
+      required uint32 eid = 1;
     }
   .
   You always wrap it in a resolution data type so you can create a
@@ -53,10 +57,13 @@ chooseSinglePool pool = (\_ -> pool)
 -}
 
 data ResObject = ResObjectUserInfo UserInfo
+               | ResObjectUserEvent UserEvent
   deriving (Show)
 
 instance MontageRiakValue ResObject where
   getPB "u-name" = lastWriteWinsBucketSpecA (ResObjectUserInfo . messageGetError "UserInfo") (\(ResObjectUserInfo o) -> messagePut o)
+  getPB "reference-u-name" = lastWriteWinsBucketSpecA (ResObjectUserInfo . messageGetError "UserInfo") (\(ResObjectUserInfo o) -> messagePut o)
+  getPB "u-event" = lastWriteWinsBucketSpecA (ResObjectUserEvent . messageGetError "UserEvent") (\(ResObjectUserEvent o) -> messagePut o)
   getPB bucket = error $ B.unpack $ B.concat [ "No resolution function defined for bucket: ", bucket ]
 
 lastWriteWins a b = b
@@ -81,8 +88,7 @@ main = do
   mainPool <- generatePool "8087" 300
   let chooser = chooseSinglePool mainPool
 
-  let crap = (ResObjectUserInfo $ UserInfo { uid = fromIntegral 1
-                                           , name = Nothing } ) :: ResObject
+  let crap = (ResObjectUserInfo $ UserInfo { uid = fromIntegral 1 } ) :: ResObject
                                                            -- sets the type inference
 
   runDaemon logCallback "montage" chooser crap

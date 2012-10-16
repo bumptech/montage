@@ -38,8 +38,7 @@ generateData :: (Int, Int) -> MontageObject
 generateData (key, uid) = MontageObject Nothing "u-name" key' data' Nothing
   where
     key' = putDecimal $ fromIntegral key
-    data' = messagePut $ UserInfo { uid = fromIntegral uid
-                                  , name = Nothing }
+    data' = messagePut $ UserInfo { uid = fromIntegral uid }
 
 threadCount :: Int
 threadCount = 1
