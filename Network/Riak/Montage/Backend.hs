@@ -13,8 +13,6 @@ import Network.StatsWeb (Stats, incCounter)
 import Network.Riak.Montage.Types
 import Data.Conduit.Pool (withResource)
 
-import Unsafe.Coerce (unsafeCoerce)
-
 maxRetries :: Int
 maxRetries = 3
 
@@ -47,8 +45,12 @@ doGet stats buck key riakPool = do
 
 doPut :: (MontageRiakValue r) => Bucket -> Key -> VectorClock -> RiakRecord r -> RiakPool -> IO (RiakResponse r)
 doPut buck key mvc rec riakPool = do
+  _ <- case rec of
+      RiakMontageLazyBs _ _ -> return ()
+      RiakMontagePb _ _ -> return ()
+      RiakMontageReference _ _ -> return ()
   let riakvc = fmap VClock mvc
-  res <- retryOperation $ withResource (riakPool buck) $ \c -> (fmap Just $ put c buck key riakvc (unsafeCoerce rec) (Just 1) Default Default)
+  res <- retryOperation $ withResource (riakPool buck) $ \c -> (fmap Just $ put c buck key riakvc rec (Just 1) Default Default)
   return $ fmap (\(r, v) -> (r, v, Nothing)) res
 
 doDelete :: (MontageRiakValue a) => Bucket -> Key -> RiakPool -> IO (RiakResponse a)
