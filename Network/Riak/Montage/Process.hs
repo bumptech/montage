@@ -10,6 +10,7 @@ import Control.Exception (finally, try, throw, SomeException)
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 import System.Timeout (timeout)
 import Data.Time.Clock.POSIX (getPOSIXTime)
+import Data.Maybe (fromJust)
 
 import qualified Data.HashMap.Strict as HM
 import Control.Applicative
@@ -18,6 +19,9 @@ import qualified Network.Riak.Types as RT
 import Text.ProtocolBuffers.Basic (toUtf8, utf8)
 import qualified Data.Text.Encoding as E
 import Data.Foldable (toList)
+
+import qualified Network.Riak.Value as V
+import qualified Network.Riak.Content as C
 
 import Network.Riak.Montage.Proto.Montage.MontageEnvelope as ME
 import Network.Riak.Montage.Proto.Montage.MontageWireMessages
@@ -136,7 +140,7 @@ generateRequest _ (MontageEnvelope MONTAGE_PUT inp _) =
     vclock = MO.vclock obj
     buck = MO.bucket obj
     key = MO.key obj
-    dat = RiakMontageLazyBs buck $ MO.data' obj --fromJust $ V.fromContent buck $ C.empty {C.value = MO.data' obj}
+    dat = fromJust $ V.fromContent buck $ C.empty { C.value = MO.data' obj }
     wrap = (fst . fromRight $ messageGet $ inp) :: MP.MontagePut
 
 generateRequest _ (MontageEnvelope MONTAGE_PUT_MANY inp _) =
@@ -147,7 +151,7 @@ generateRequest _ (MontageEnvelope MONTAGE_PUT_MANY inp _) =
     makePut g = (MO.vclock g, buck, MO.key g, dat)
       where
         buck = MO.bucket g
-        dat = RiakMontageLazyBs buck $ MO.data' g --fromJust $ V.fromContent buck $ C.empty { C.value = MO.data' g }
+        dat = fromJust $ V.fromContent buck $ C.empty { C.value = MO.data' g }
 
 generateRequest _ (MontageEnvelope MONTAGE_GET_REFERENCE inp _) =
     ChainReference buck key targetBuck msub
