@@ -6,6 +6,7 @@ import Network.Riak (defaultClient, connect, disconnect,
 import qualified Data.Attoparsec.ByteString.Char8 as AttoC
 import qualified Data.ByteString.Char8 as S
 
+import Control.Monad
 import Control.Exception (try, SomeException(..), fromException, throw)
 import System.ZMQ as ZMQ
 import System.IO
@@ -91,8 +92,6 @@ testReferenceGet pool = do
 
   testPut pool $ generateUIData (1, 2) -- bucket=u-name, key=1, value=2
   testPut pool $ generateUEData (2, 3) -- bucket=u-event, key=2, value=3
-
-  testReferenceSet pool "u-name" (toKey 1) "u-event"
 
   -- test reference get
   result <- montageGetBy pool "u-name" (toKey 1) "u-event"
