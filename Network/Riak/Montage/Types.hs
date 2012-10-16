@@ -33,7 +33,7 @@ class (Show a) => MontageRiakValue a where
     ensureEval _ = error "non lazy or pb passed to pb `eval`"
 
 instance (MontageRiakValue a) => Resolvable (RiakRecord a) where
-    resolve r1@(RiakMontageReference _ _) (RiakMontageReference _ _) = r1
+    resolve (RiakMontageReference _ _) r2@(RiakMontageReference _ _) = r2
 
     -- force deserialization for resolution
     resolve r1@(RiakMontageLazyBs _ _) r2 = resolve (ensureEval r1) r2
