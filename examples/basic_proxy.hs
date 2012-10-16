@@ -37,8 +37,9 @@ chooseSinglePool pool = (\_ -> pool)
 -- Resolution logic
 {-
   Here your data is a simple protocol buffer:
-    message UserName {
-      required string username = 1;
+    message UserInfo {
+      required uint32 uid = 1;
+      optional string name = 2;
     }
   .
   You always wrap it in a resolution data type so you can create a
