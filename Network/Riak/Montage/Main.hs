@@ -1,5 +1,6 @@
 module Network.Riak.Montage.Main where
 
+import System.IO (hSetBuffering, BufferMode(..), stdout, stderr)
 import Control.Monad (forever, void)
 import Control.Concurrent (forkIO, threadDelay)
 import qualified Data.Text as T
@@ -25,6 +26,9 @@ sleepForever = forever $ threadDelay (1000000 * 3600)
 
 runDaemon :: (MontageRiakValue a) => LogCallback -> T.Text -> RiakPool -> a -> IO ()
 runDaemon logger prefix chooser crap = do
+    hSetBuffering stdout LineBuffering
+    hSetBuffering stderr LineBuffering
+
     stats <- initStats prefix
     mapM_ (addCounter stats) montageStats
 

@@ -18,8 +18,8 @@ import User.UserEvent
 
 -- Logging
 
-sillyCallback :: B.ByteString -> Maybe Double -> Value -> IO () -- :: LogCallback
-sillyCallback logType _ val = logError $ (B.unpack logType) ++ " " ++ show val
+simpleCallback :: B.ByteString -> Maybe Double -> Value -> IO () -- :: LogCallback
+simpleCallback logType _ val = logError $ (B.unpack logType) ++ " " ++ show val
 
 -- Pool setup
 
@@ -83,12 +83,10 @@ messageGetError cls v =
 
 main :: IO ()
 main = do
-  let logCallback = sillyCallback
-
   mainPool <- generatePool "8087" 300
   let chooser = chooseSinglePool mainPool
 
   let crap = (ResObjectUserInfo $ UserInfo { uid = fromIntegral 1 } ) :: ResObject
                                                            -- sets the type inference
 
-  runDaemon logCallback "montage" chooser crap
+  runDaemon simpleCallback "montage" chooser crap
