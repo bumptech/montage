@@ -19,11 +19,12 @@ import qualified Network.Riak.Content as C
 class (Show a) => MontageRiakValue a where
     getPB :: L.ByteString -> BucketSpec a
 
+    referenceKey :: a -> Maybe Key
+
     customCommandHandler :: T.Text -> Maybe L.ByteString -> ChainIteration a
     customCommandHandler cmd = error $ "No handler for custom command: " ++ T.unpack cmd
 
     riakSerialize :: RiakRecord a -> L.ByteString
-    riakSerialize (RiakMontageReference _ bs) = bs
     riakSerialize (RiakMontageLazyBs _ bs) = bs
     riakSerialize (RiakMontagePb b v) = (deconstruct $ getPB b) v
 
@@ -33,8 +34,6 @@ class (Show a) => MontageRiakValue a where
     ensureEval _ = error "non lazy or pb passed to pb `eval`"
 
 instance (MontageRiakValue a) => Resolvable (RiakRecord a) where
-    resolve (RiakMontageReference _ _) r2@(RiakMontageReference _ _) = r2
-
     -- force deserialization for resolution
     resolve r1@(RiakMontageLazyBs _ _) r2 = resolve (ensureEval r1) r2
     resolve r1 r2@(RiakMontageLazyBs _ _) = resolve r1 (ensureEval r2)
@@ -42,16 +41,12 @@ instance (MontageRiakValue a) => Resolvable (RiakRecord a) where
     resolve (RiakMontagePb b o1) (RiakMontagePb _ o2) = RiakMontagePb b $ (pbResolve $ getPB b) o1 o2
     resolve _ _  = error "no resolution code for record type, wtfbbq?"
 
-refPfx :: L.ByteString
-refPfx = "reference-"
-
-rlen :: Int64
-rlen = L.length refPfx
+getReferenceKey :: (MontageRiakValue a) => RiakRecord a -> Maybe Key
+getReferenceKey (RiakMontagePb _ v) = referenceKey v
+getReferenceKey (RiakMontageLazyBs _ bstr) = Just bstr
 
 instance (MontageRiakValue a) => V.IsContent (RiakRecord a) where
-    parseContent buck c | L.take rlen buck == refPfx = return $ RiakMontageReference buck $ C.value c
-                          | otherwise                    = return $ RiakMontageLazyBs buck $ C.value c
-
+    parseContent buck c = return $ RiakMontageLazyBs buck $ C.value c
     toContent = C.binary . riakSerialize
 
 showRiakRecord :: (Show a, Show b) => a -> b -> [Char]
@@ -60,7 +55,6 @@ showRiakRecord b v = "(buck=" ++ show b ++ ", val=" ++ show v ++ ")"
 instance (MontageRiakValue a) => Show (RiakRecord a) where
     show (RiakMontageLazyBs b v) = showRiakRecord b v
     show (RiakMontagePb b v) = showRiakRecord b v
-    show (RiakMontageReference b v) = showRiakRecord b v
 
 data PoolSpec = PoolA -- bam etc, ssd
               | PoolB -- boss, slower
@@ -84,8 +78,7 @@ type Deconstructor a = a -> L.ByteString
 type VectorClock = Maybe L.ByteString
 
 data (MontageRiakValue r) => RiakRecord r = RiakMontageLazyBs Bucket L.ByteString
-                                    | RiakMontagePb Bucket r
-                                    | RiakMontageReference Bucket L.ByteString
+                                          | RiakMontagePb Bucket r
 
 data (MontageRiakValue r) => ChainIteration r =
       IterationRiakCommand [RiakRequest r] ([RiakResponse r] -> ChainCommand r)
@@ -109,8 +102,8 @@ data (MontageRiakValue r) => ChainCommand r =
     | ChainCommandIO (IO (ChainCommand r))
 
 data (MontageRiakValue a) => RiakRequest a = RiakGet Bucket Key
-                                     | RiakPut VectorClock Bucket Key (RiakRecord a)
-                                     | RiakDelete Bucket Key
+                                           | RiakPut VectorClock Bucket Key (RiakRecord a)
+                                           | RiakDelete Bucket Key
 
 type RiakResponse a = Maybe (RiakRecord a, VClock, Maybe Int)
 

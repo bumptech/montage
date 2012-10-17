@@ -162,14 +162,6 @@ generateRequest _ (MontageEnvelope MONTAGE_GET_REFERENCE inp _) =
     msub = MGR.sub wrap
     wrap = (fst . fromRight $ messageGet $ inp) :: MGR.MontageGetReference
 
-generateRequest _ (MontageEnvelope MONTAGE_SET_REFERENCE inp _) =
-    ChainReferenceSet buck key targetKey
-  where
-    buck = MSR.bucket wrap
-    key = MSR.key wrap
-    targetKey = MSR.target_key wrap
-    wrap = (fst . fromRight $ messageGet $ inp) :: MSR.MontageSetReference
-
 generateRequest _ (MontageEnvelope MONTAGE_DELETE inp _) =
     ChainDelete buck key Nothing
   where
