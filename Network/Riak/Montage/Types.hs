@@ -92,8 +92,12 @@ data (MontageRiakValue r) => ChainIteration r =
     | IterationResponse CommandResponse
     | ChainIterationIO (IO (ChainCommand r))
 
-data CommandResponse = forall a. (Wire a, ReflectDescriptor a) => ResponseProtobuf MontageWireMessages a
+data CommandResponse = forall a. (Wire a, ReflectDescriptor a, Show a) => ResponseProtobuf MontageWireMessages a
                      | ResponseCustom T.Text (Maybe L.ByteString)
+
+instance Show CommandResponse where
+    show (ResponseProtobuf t r) = "CommandResponsePB [" ++ show t ++ "] " ++ show r
+    show (ResponseCustom t r) = "CommandResponseCustom [" ++ show t ++ "] " ++ show r
 
 data (MontageRiakValue r) => ChainCommand r =
       ChainGet Bucket Key (Maybe MontageSubrequestSpec) (Maybe ([RiakResponse r] -> ChainCommand r))
@@ -107,6 +111,10 @@ data (MontageRiakValue r) => ChainCommand r =
     | ChainCustom T.Text (Maybe L.ByteString)
     | ChainReturn CommandResponse
     | ChainCommandIO (IO (ChainCommand r))
+
+instance (MontageRiakValue r) => Show (ChainCommand r) where
+    show (ChainCommandIO _) = "Can't show things inside the IO monad"
+    show v = show v
 
 data (MontageRiakValue a) => RiakRequest a = RiakGet Bucket Key
                                      | RiakPut VectorClock Bucket Key (RiakRecord a)
