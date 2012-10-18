@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Network.Riak.Montage.Commands where
 
 import Network.Riak.Montage.Proto.Montage.MontageWireMessages
@@ -90,14 +91,15 @@ exec (ChainDelete buck key mcallback) =
     finishDelete [Nothing] = ChainReturn $ ResponseProtobuf MONTAGE_DELETE_RESPONSE MontageDeleteResponse
     finishDelete _ = error "Delete should never return a result"
 
-exec (ChainReference ref key realBucket msub) =
+exec (ChainReference ref key targets) =
     IterationRiakCommand [RiakGet ref key] finishFollowRef
   where
     finishFollowRef :: (MontageRiakValue r) => [RiakResponse r] -> ChainCommand r
     finishFollowRef (r:[]) =
-        case r of
-            Just (val, _, _) -> case getReferenceKey val of
-                Just realKey -> ChainGet realBucket realKey msub Nothing
+      case r of
+            Just resp@(val, _, _) -> case getReferenceKey (ensureEval val) of
+                Just realKey -> let firstLookup = (Just $ makeObject ref key resp) in
+                    ChainGetMany [ (t, realKey) | t <- targets ] firstLookup Nothing
                 Nothing -> nullResp
             Just _ -> error "Error in reference fetch"
             Nothing -> nullResp
@@ -111,7 +113,6 @@ exec (ChainCustom cmd arg) = customCommandHandler cmd arg
 
 exec (ChainCommandIO cmd) = ChainIterationIO cmd
 
-exec (ChainSub _ _ _) = error "Cannot handle ChainSub commands"
 -- Finally...
 exec (ChainReturn resp) = IterationResponse resp
 

@@ -94,9 +94,7 @@ data (MontageRiakValue r) => ChainCommand r =
     | ChainPut VectorClock Bucket Key (RiakRecord r) (Maybe ([RiakResponse r] -> ChainCommand r))
     | ChainPutMany [(VectorClock, Bucket, Key, RiakRecord r)] (Maybe ([RiakResponse r] -> ChainCommand r))
     | ChainDelete Bucket Key (Maybe ([RiakResponse r] -> ChainCommand r))
-    | ChainReference Bucket Key Bucket (Maybe MontageSubrequestSpec)
-    | ChainReferenceSet Bucket Key Key
-    | ChainSub (RiakRecord r) Specifier Argument
+    | ChainReference Bucket Key [Bucket]
     | ChainCustom T.Text (Maybe L.ByteString)
     | ChainReturn CommandResponse
     | ChainCommandIO (IO (ChainCommand r))

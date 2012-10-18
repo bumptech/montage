@@ -19,6 +19,7 @@ import qualified Network.Riak.Types as RT
 import Text.ProtocolBuffers.Basic (toUtf8, utf8)
 import qualified Data.Text.Encoding as E
 import Data.Foldable (toList)
+import qualified Data.ListLike as LL
 
 import qualified Network.Riak.Value as V
 import qualified Network.Riak.Content as C
@@ -35,7 +36,6 @@ import Network.Riak.Montage.Util
 import qualified Network.Riak.Montage.Proto.Montage.MontageGet as MG
 import qualified Network.Riak.Montage.Proto.Montage.MontageGetMany as MGM
 import qualified Network.Riak.Montage.Proto.Montage.MontageGetReference as MGR
-import qualified Network.Riak.Montage.Proto.Montage.MontageSetReference as MSR
 import qualified Network.Riak.Montage.Proto.Montage.MontagePut as MP
 import qualified Network.Riak.Montage.Proto.Montage.MontagePutMany as MPM
 import qualified Network.Riak.Montage.Proto.Montage.MontageObject as MO
@@ -154,12 +154,11 @@ generateRequest _ (MontageEnvelope MONTAGE_PUT_MANY inp _) =
         dat = fromJust $ V.fromContent buck $ C.empty { C.value = MO.data' g }
 
 generateRequest _ (MontageEnvelope MONTAGE_GET_REFERENCE inp _) =
-    ChainReference buck key targetBuck msub
+    ChainReference buck key targets
   where
     buck = MGR.bucket wrap
     key = MGR.key wrap
-    targetBuck = MGR.target_bucket wrap
-    msub = MGR.sub wrap
+    targets = LL.toList $ MGR.target_buckets wrap
     wrap = (fst . fromRight $ messageGet $ inp) :: MGR.MontageGetReference
 
 generateRequest _ (MontageEnvelope MONTAGE_DELETE inp _) =
