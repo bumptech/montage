@@ -30,7 +30,6 @@ import Network.Riak.Montage.Proto.Montage.MontageEnvelope as ME
 import Network.Riak.Montage.Proto.Montage.MontageGet
 import Network.Riak.Montage.Proto.Montage.MontagePut
 import Network.Riak.Montage.Proto.Montage.MontageGetMany
-import Network.Riak.Montage.Proto.Montage.MontageSetReference
 import Network.Riak.Montage.Proto.Montage.MontageGetReference
 import Network.Riak.Montage.Proto.Montage.MontageGetResponse as MGR
 import Network.Riak.Montage.Proto.Montage.MontagePutResponse as MPR
@@ -88,29 +87,18 @@ montageGet pool buck key = do
           where msg = messageGetError "montageGet: MontageGetResponse" $ ME.msg res
         _                  -> formatThrow "Unknown response to MontageGet" () >> return Nothing
 
-montageSetBy :: MontagePool -> L.ByteString -> L.ByteString -> L.ByteString -> IO (Maybe Utf8)
-montageSetBy pool buck key target = do
-    uid <- fmap (B.pack . show) uuid
-    let req = messagePut $ MontageEnvelope MONTAGE_SET_REFERENCE (messagePut $ MontageSetReference buck key target) (Just uid)
-    res <- montageRpc pool req
-    assertM (ME.msgid res == Just uid) "mismatched req/response!" ()
-    case ME.mtype res of
-        MONTAGE_COMMAND_RESPONSE -> return $ Just $ MCR.status $ messageGetError "montageGet: MontageCommandResponse" $ ME.msg res
-        MONTAGE_ERROR        -> formatThrow "Incorrect response to MontageSetReference: error={}, bucket={}, key={}" (Shown $ MErr.error msg, Shown buck, Shown key) >> return Nothing
-          where msg = messageGetError "montageSetBy: MontageCommandResponse" $ ME.msg res
-        _                  -> formatThrow "Unknown response to MontageSetReference" () >> return Nothing
-
-montageGetBy :: MontagePool -> L.ByteString -> L.ByteString -> L.ByteString -> IO (Maybe MontageObject)
+montageGetBy :: MontagePool -> L.ByteString -> L.ByteString -> [L.ByteString] -> IO (Maybe MontageObject, [MontageObject])
 montageGetBy pool buck key target = do
     uid <- fmap (B.pack . show) uuid
-    let req = messagePut $ MontageEnvelope MONTAGE_GET_REFERENCE (messagePut $ MontageGetReference buck key target Nothing) (Just uid)
+    let req = messagePut $ MontageEnvelope MONTAGE_GET_REFERENCE (messagePut $ MontageGetReference buck key (Seq.fromList target)) (Just uid)
     res <- montageRpc pool req
     assertM (ME.msgid res == Just uid) "mismatched req/response!" ()
     case ME.mtype res of
-        MONTAGE_GET_RESPONSE -> return $ MGR.master $ messageGetError "montageGet: MontageGetResponse" $ ME.msg res
-        MONTAGE_ERROR        -> formatThrow "Incorrect response to MontageGet: error={}, bucket={}, key={}" (Shown $ MErr.error msg, Shown buck, Shown key) >> return Nothing
+        MONTAGE_GET_RESPONSE -> return (MGR.master mo, LL.toList $ MGR.subs mo)
+          where mo = messageGetError "montageGet: MontageGetResponse" $ ME.msg res
+        MONTAGE_ERROR        -> formatThrow "Incorrect response to MontageGet: error={}, bucket={}, key={}" (Shown $ MErr.error msg, Shown buck, Shown key) >> return (Nothing, [])
           where msg = messageGetError "montageGet: MontageGetResponse" $ ME.msg res
-        _                  -> formatThrow "Unknown response to MontageGet" () >> return Nothing
+        _                  -> formatThrow "Unknown response to MontageGet" () >> return (Nothing, [])
 
 montagePut :: MontagePool -> MontageObject -> IO (Maybe MontageObject)
 montagePut pool os = do

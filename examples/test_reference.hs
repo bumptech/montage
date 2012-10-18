@@ -15,13 +15,16 @@ import Data.Word (Word8)
 import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.ByteString.Lazy as BW
 
+import Text.ProtocolBuffers.Basic (toUtf8)
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut, Wire)
 import Text.ProtocolBuffers.Reflections (ReflectDescriptor)
 
 import MontageClient
 import Network.Riak.Montage.Proto.Montage.MontageObject as MO
+
 import User.UserInfo as UI
 import User.UserEvent as UE
+import User.UserName as UN
 
 -- utils
 
@@ -48,16 +51,31 @@ getDecimal = fromRight . AttoC.parseOnly AttoC.decimal
 -- test client
 
 generateUIData :: (Int, Int) -> MontageObject
-generateUIData (key, uid) = MontageObject Nothing "u-name" key' data' Nothing
+generateUIData (key, uid) = MontageObject Nothing "u-info" key' data' Nothing
   where
     key' = putDecimal $ fromIntegral key
     data' = messagePut $ UserInfo { uid = fromIntegral uid }
+
+getUI :: MontageObject -> UserInfo
+getUI = (messageGetError "u-info") . MO.data'
 
 generateUEData :: (Int, Int) -> MontageObject
 generateUEData (key, eid) = MontageObject Nothing "u-event" key' data' Nothing
   where
     key' = putDecimal $ fromIntegral key
     data' = messagePut $ UserEvent { eid = fromIntegral eid }
+
+getUE :: MontageObject -> UserEvent
+getUE = (messageGetError "u-event") . MO.data'
+
+generateUNData :: (Int, BW.ByteString) -> MontageObject
+generateUNData (key, nameStr) = MontageObject Nothing "u-name" key' data' Nothing
+  where
+    key' = putDecimal $ fromIntegral key
+    data' = messagePut $ UserName { name = nameStr }
+
+getUN :: MontageObject -> UserName
+getUN = (messageGetError "u-name") . MO.data'
 
 testGet :: MontagePool -> BW.ByteString -> BW.ByteString -> IO (Maybe MontageObject)
 testGet pool bucket key = do
@@ -77,30 +95,33 @@ testPut pool data' = do
         hPutStrLn stdout "\nput: "
         hPutStrLn stdout $ show res
 
-testReferenceSet :: MontagePool -> BW.ByteString -> BW.ByteString -> BW.ByteString -> IO ()
-testReferenceSet pool bucket key target = do
-  mr <- try $ montageSetBy pool bucket key target
-  case mr of
-      Left (e :: SomeException) -> hPutStrLn stdout "This client fucked up"
-      Right res -> do
-          hPutStrLn stdout "\nset: "
-          hPutStrLn stdout $ show res
-
 testReferenceGet :: MontagePool -> IO ()
 testReferenceGet pool = do
-  let toKey = (putDecimal . fromIntegral)
+    let toKey = (putDecimal . fromIntegral)
 
-  testPut pool $ generateUIData (1, 2) -- bucket=u-name, key=1, value=2
-  testPut pool $ generateUEData (2, 3) -- bucket=u-event, key=2, value=3
+    testPut pool $ generateUIData (1, 2) -- bucket=u-name, key=1, value=2
+    testPut pool $ generateUEData (2, 3) -- bucket=u-event, key=2, value=3
+    testPut pool $ generateUNData (2, "montage") -- bucket=u-name, key=2, value="montage"
 
-  -- test reference get
-  result <- montageGetBy pool "u-name" (toKey 1) "u-event"
-  case result of
-      Just res -> case dataBack res == (fromIntegral 3) of
-          True -> hPutStrLn stdout $ "\nReference lookup correctly found: " ++ (show res)
-          False -> hPutStrLn stdout $ "\nReference lookup failed: " ++ (show res)
-        where dataBack = UE.eid . (messageGetError "u-event") . MO.data'
-      Nothing -> hPutStrLn stdout $ "Found nothing from reference lookup"
+    -- test reference get on multiple targets: "u-event" "u-name"
+    (subKey, valuesFound) <- montageGetBy pool "u-info" (toKey 1) ["u-event", "u-name"]
+    case subKey of
+        Just key ->
+            if UI.uid (getUI key) == (fromIntegral 2) then successK key else failureK key
+        Nothing -> hPutStrLn stdout "\nReference get couldn't find subKey"
+
+    case length valuesFound == 2 of
+        True -> do
+            let [ue, un] = valuesFound
+            if UE.eid (getUE ue) == (fromIntegral 3) then successV ue else failureV ue
+            if UN.name (getUN un) == "montage" then successV un else failureV un
+        False -> hPutStrLn stdout $ "\nReference get couldn't find the correct number of values. Looking for 2, found " ++ (show $ length valuesFound)
+  where
+    successK k = hPutStrLn stdout $ "\nReference get found correct key: " ++ show k
+    failureK k = hPutStrLn stdout $ "\nReference get found incorrect key: " ++ show k
+
+    successV v = hPutStrLn stdout $ "\nReference get found correct value: " ++ show v
+    failureV v = hPutStrLn stdout $ "\nReference get found incorrect value: " ++ show v
 
 threadCount :: Int
 threadCount = 1

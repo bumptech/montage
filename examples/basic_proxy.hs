@@ -15,8 +15,9 @@ import Text.ProtocolBuffers.Basic (Utf8, toUtf8, uFromString)
 import Network.Riak.Montage
 import Network.Riak.Montage.Util
 
-import User.UserInfo
-import User.UserEvent
+import User.UserInfo as UI
+import User.UserEvent as UE
+import User.UserName as UN
 
 -- Logging
 
@@ -60,10 +61,11 @@ chooseSinglePool pool = (\_ -> pool)
 
 data ResObject = ResObjectUserInfo UserInfo
                | ResObjectUserEvent UserEvent
+               | ResObjectUserName UserName
   deriving (Show)
 
 instance MontageRiakValue ResObject where
-  getPB "u-name" = BucketSpec
+  getPB "u-info" = BucketSpec
                    PoolA
                    (ResObjectUserInfo . messageGetError "UserInfo")
                    lastWriteWins
@@ -75,10 +77,17 @@ instance MontageRiakValue ResObject where
                    lastWriteWins
                    undefined
                    (\(ResObjectUserEvent o) -> messagePut o)
+  getPB "u-name" = BucketSpec
+                   PoolA
+                   (ResObjectUserName . messageGetError "UserName")
+                   lastWriteWins
+                   undefined
+                   (\(ResObjectUserName o) -> messagePut o)
   getPB bucket = error $ B.unpack $ B.concat [ "No resolution function defined for bucket: ", bucket ]
 
-  referenceKey (ResObjectUserInfo pb) = Just $ (putDecimal . fromIntegral) $ (uid pb)
-  referenceKey (ResObjectUserEvent pb) = Just $ (putDecimal . fromIntegral) $ (eid pb)
+  referenceKey (ResObjectUserInfo pb) = Just $ (putDecimal . fromIntegral . UI.uid) $ pb
+  referenceKey (ResObjectUserEvent pb) = Just $ (putDecimal . fromIntegral . UE.eid) $ pb
+  referenceKey (ResObjectUserName pb) = Nothing -- no reference key for this string value
   referenceKey _ = Nothing
 
 putDecimal' :: Int -> [Word8]
