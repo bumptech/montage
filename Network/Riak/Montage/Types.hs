@@ -43,7 +43,7 @@ instance (MontageRiakValue a) => Resolvable (RiakRecord a) where
 
 getReferenceKey :: (MontageRiakValue a) => RiakRecord a -> Maybe Key
 getReferenceKey (RiakMontagePb _ v) = referenceKey v
-getReferenceKey (RiakMontageLazyBs _ bstr) = Just bstr
+getReferenceKey (RiakMontageLazyBs _ bstr) = error "should never request reference key from lazy bytestring"
 
 instance (MontageRiakValue a) => V.IsContent (RiakRecord a) where
     parseContent buck c = return $ RiakMontageLazyBs buck $ C.value c
