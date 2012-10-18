@@ -5,3 +5,7 @@ message UserInfo {
 message UserEvent {
   required uint32 eid = 1;
 }
+
+message UserName {
+  required bytes name = 1;
+}

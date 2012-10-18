@@ -3,8 +3,10 @@ import Data.Conduit.Pool (Pool, createPool)
 import Network.Riak (defaultClient, connect, disconnect,
                     Client(port), Connection)
 
+import qualified Data.ByteString.Lazy as BW
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Aeson (Value, (.=), object, encode)
+import Data.Word (Word8)
 
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut, Wire)
 import Text.ProtocolBuffers.Reflections (ReflectDescriptor)
@@ -13,8 +15,9 @@ import Text.ProtocolBuffers.Basic (Utf8, toUtf8, uFromString)
 import Network.Riak.Montage
 import Network.Riak.Montage.Util
 
-import User.UserInfo
-import User.UserEvent
+import User.UserInfo as UI
+import User.UserEvent as UE
+import User.UserName as UN
 
 -- Logging
 
@@ -58,13 +61,46 @@ chooseSinglePool pool = (\_ -> pool)
 
 data ResObject = ResObjectUserInfo UserInfo
                | ResObjectUserEvent UserEvent
+               | ResObjectUserName UserName
   deriving (Show)
 
 instance MontageRiakValue ResObject where
-  getPB "u-name" = lastWriteWinsBucketSpecA (ResObjectUserInfo . messageGetError "UserInfo") (\(ResObjectUserInfo o) -> messagePut o)
-  getPB "reference-u-name" = lastWriteWinsBucketSpecA (ResObjectUserInfo . messageGetError "UserInfo") (\(ResObjectUserInfo o) -> messagePut o)
-  getPB "u-event" = lastWriteWinsBucketSpecA (ResObjectUserEvent . messageGetError "UserEvent") (\(ResObjectUserEvent o) -> messagePut o)
+  getPB "u-info" = BucketSpec
+                   PoolA
+                   (ResObjectUserInfo . messageGetError "UserInfo")
+                   lastWriteWins
+                   undefined
+                   (\(ResObjectUserInfo o) -> messagePut o)
+  getPB "u-event" = BucketSpec
+                   PoolA
+                   (ResObjectUserEvent . messageGetError "UserEvent")
+                   lastWriteWins
+                   undefined
+                   (\(ResObjectUserEvent o) -> messagePut o)
+  getPB "u-name" = BucketSpec
+                   PoolA
+                   (ResObjectUserName . messageGetError "UserName")
+                   lastWriteWins
+                   undefined
+                   (\(ResObjectUserName o) -> messagePut o)
   getPB bucket = error $ B.unpack $ B.concat [ "No resolution function defined for bucket: ", bucket ]
+
+  referenceKey (ResObjectUserInfo pb) = Just $ (putDecimal . fromIntegral . UI.uid) $ pb
+  referenceKey (ResObjectUserEvent pb) = Just $ (putDecimal . fromIntegral . UE.eid) $ pb
+  referenceKey (ResObjectUserName pb) = Nothing -- no reference key for this string value
+  referenceKey _ = Nothing
+
+putDecimal' :: Int -> [Word8]
+putDecimal' 0 = []
+putDecimal' i = ((fromIntegral f) + 48) : putDecimal' (fromIntegral r)
+  where
+    (r, f) = i `divMod` 10
+{-# INLINE putDecimal' #-}
+
+putDecimal :: Int -> B.ByteString
+putDecimal i | i < 0     = BW.pack $ (45 :: Word8) : (reverse $ putDecimal' $ abs i)
+             | otherwise = BW.pack $ reverse $ putDecimal' i
+{-# INLINE putDecimal #-}
 
 lastWriteWins a b = b
 lastWriteWinsBucketSpecA a b = BucketSpec PoolA a lastWriteWins undefined b

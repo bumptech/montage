@@ -7,7 +7,7 @@ enum MontageWireMessages {
     MONTAGE_PUT = 6;
     MONTAGE_PUT_RESPONSE = 7;
     MONTAGE_GET_MANY = 8;
-    MONTAGE_SET_REFERENCE = 9;
+    DEPRICATED_MONTAGE_SET_REFERENCE = 9;
     MONTAGE_PUT_MANY = 10;
     MONTAGE_PUT_MANY_RESPONSE = 11;
     MONTAGE_ERROR = 12;
@@ -36,14 +36,7 @@ message MontageGetMany {
 message MontageGetReference {
     required bytes bucket = 1;
     required bytes key = 2;
-    required bytes target_bucket = 3;
-    optional MontageSubrequestSpec sub = 4;
-}
-
-message MontageSetReference {
-    required bytes bucket = 1;
-    required bytes key = 2;
-    required bytes target_key = 3;
+    repeated bytes target_buckets = 3;
 }
 
 enum MontageGetStatus {

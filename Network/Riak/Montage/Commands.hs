@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Network.Riak.Montage.Commands where
 
 import Network.Riak.Montage.Proto.Montage.MontageWireMessages
@@ -6,7 +7,6 @@ import Data.Maybe (fromMaybe)
 import qualified Network.Riak.Types as RT
 import qualified Data.Sequence as Seq
 import qualified Data.ByteString.Lazy.Char8 as L
-
 
 import Network.Riak.Types
 
@@ -91,32 +91,28 @@ exec (ChainDelete buck key mcallback) =
     finishDelete [Nothing] = ChainReturn $ ResponseProtobuf MONTAGE_DELETE_RESPONSE MontageDeleteResponse
     finishDelete _ = error "Delete should never return a result"
 
-exec (ChainReference ref key realBucket msub) =
-    let fullbuck = L.concat [refPfx, ref] in
-    IterationRiakCommand [RiakGet fullbuck key] finishFollowRef
+exec (ChainReference ref key targets) =
+    IterationRiakCommand [RiakGet ref key] finishFollowRef
   where
     finishFollowRef :: (MontageRiakValue r) => [RiakResponse r] -> ChainCommand r
     finishFollowRef (r:[]) =
-        case r of
-            Just (RiakMontageReference _ realKey, _, _) -> ChainGet realBucket realKey msub Nothing
-            Just _ -> error "Reference not returned from reference fetch"
-            Nothing ->
-                ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
-                    MontageGetResponse Seq.empty Nothing Seq.empty
+      case r of
+            Just resp@(val, _, _) -> case getReferenceKey (ensureEval val) of
+                Just realKey -> let firstLookup = (Just $ makeObject ref key resp) in
+                    ChainGetMany [ (t, realKey) | t <- targets ] firstLookup Nothing
+                Nothing -> nullResp
+            Just _ -> error "Error in reference fetch"
+            Nothing -> nullResp
     finishFollowRef _ = error "Unexpected result back from RiakGet"
 
-exec (ChainReferenceSet ref key realKey) =
-    let fullbuck = L.concat [refPfx, ref] in
-    IterationRiakCommand [RiakPut Nothing fullbuck key $ RiakMontageReference fullbuck realKey] finishSetRef
-  where
-    finishSetRef :: (MontageRiakValue r) => [RiakResponse r] -> ChainCommand r
-    finishSetRef _ = ChainReturn $ ResponseCustom "reference-set-okay" Nothing
+    nullResp = ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
+                    MontageGetResponse Seq.empty Nothing Seq.empty
+
 
 exec (ChainCustom cmd arg) = customCommandHandler cmd arg
 
 exec (ChainCommandIO cmd) = ChainIterationIO cmd
 
-exec (ChainSub _ _ _) = error "Cannot handle ChainSub commands"
 -- Finally...
 exec (ChainReturn resp) = IterationResponse resp
 
