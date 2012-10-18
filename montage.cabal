@@ -36,7 +36,6 @@ Library
                        Network.Riak.Montage.Proto.Montage.MontagePutMany
                        Network.Riak.Montage.Proto.Montage.MontagePutManyResponse
                        Network.Riak.Montage.Proto.Montage.MontagePutResponse
-                       Network.Riak.Montage.Proto.Montage.MontageSetReference
                        Network.Riak.Montage.Proto.Montage.MontageSubrequestSpec
                        Network.Riak.Montage.Proto.Montage.MontageWireMessages
 
@@ -49,13 +48,14 @@ Library
                   system-uuid>=2,
                   aeson>=0.3,
                   text>=0.11,
+                  ListLike,
                   stm>=2.2,
                   riak-bump>=0.7.3.4,
                   pool-conduit>=0.1.0.2&&<0.2,
                   unordered-containers >= 0.2.1 && < 0.3,
                   zeromq-haskell>=0.8 && < 0.9,
-                  protocol-buffers == 2.0.11,
-                  protocol-buffers-descriptor == 2.0.11,
+                  protocol-buffers >= 2.0.11,
+                  protocol-buffers-descriptor >= 2.0.11,
                   stats-web,
                   safe
 
