@@ -101,7 +101,6 @@ exec (ChainReference ref key targets) =
                 Just realKey -> let firstLookup = (Just $ makeObject ref key resp) in
                     ChainGetMany [ (t, realKey) | t <- targets ] firstLookup Nothing
                 Nothing -> nullResp
-            Just _ -> error "Error in reference fetch"
             Nothing -> nullResp
     finishFollowRef _ = error "Unexpected result back from RiakGet"
 

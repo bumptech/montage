@@ -10,7 +10,6 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.Text as T
 import Network.Riak.Types
 import Data.Conduit.Pool (Pool)
-import GHC.Int (Int64)
 
 import Network.Riak (Resolvable(..))
 import qualified Network.Riak.Value as V
@@ -31,7 +30,6 @@ class (Show a) => MontageRiakValue a where
     ensureEval :: RiakRecord a -> RiakRecord a
     ensureEval (RiakMontageLazyBs b s) = RiakMontagePb b $ construct (getPB b) s
     ensureEval r@(RiakMontagePb _ _) = r
-    ensureEval _ = error "non lazy or pb passed to pb `eval`"
 
 class Poolable p where
     chooser :: p -> Bucket -> Pool Connection
@@ -42,11 +40,10 @@ instance (MontageRiakValue a) => Resolvable (RiakRecord a) where
     resolve r1 r2@(RiakMontageLazyBs _ _) = resolve r1 (ensureEval r2)
 
     resolve (RiakMontagePb b o1) (RiakMontagePb _ o2) = RiakMontagePb b $ (pbResolve $ getPB b) o1 o2
-    resolve _ _  = error "no resolution code for record type, wtfbbq?"
 
 getReferenceKey :: (MontageRiakValue a) => RiakRecord a -> Maybe Key
 getReferenceKey (RiakMontagePb _ v) = referenceKey v
-getReferenceKey (RiakMontageLazyBs _ bstr) = error "should never request reference key from lazy bytestring"
+getReferenceKey (RiakMontageLazyBs _ _) = error "should never request reference key from lazy bytestring"
 
 instance (MontageRiakValue a) => V.IsContent (RiakRecord a) where
     parseContent buck c = return $ RiakMontageLazyBs buck $ C.value c
