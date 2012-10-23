@@ -1,15 +1,16 @@
 module Network.Riak.Montage
-       (MontageRiakValue(..),
-        BucketSpec(..),
-        PoolSpec(..),
-        ChainCommand(..),
-        RiakRequest(..),
-        RiakRecord(..),
-        CommandResponse(..),
-        ChainIteration(..),
-        RiakResponse,
-        RiakPool,
-        runDaemon,
+       (
+          MontageRiakValue(..)
+        , Poolable(..)
+        , BucketSpec(..)
+        , ChainCommand(..)
+        , RiakRequest(..)
+        , RiakRecord(..)
+        , CommandResponse(..)
+        , ChainIteration(..)
+        , RiakResponse
+        , PoolChooser
+        , runDaemon
         )
        where
 

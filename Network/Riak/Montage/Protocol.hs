@@ -70,8 +70,8 @@ zmqRpcReply c inproc retid out = do
         send s retid []
         )
 
-serveMontageZmq :: (MontageRiakValue r) => r -> ConcurrentState -> LogCallback -> RiakPool -> Stats -> IO ()
-serveMontageZmq b state logger riakPool stats = do
+serveMontageZmq :: (MontageRiakValue r) => r -> ConcurrentState -> LogCallback -> PoolChooser -> Stats -> IO ()
+serveMontageZmq b state logger chooser' stats = do
     runZmqRpc "tcp://*:7078" wrapMontage
   where
     wrapMontage m cb = do
@@ -79,7 +79,7 @@ serveMontageZmq b state logger riakPool stats = do
             Right (env, x) | B.length x == 0 -> do
                 res <- try $ do
                     let !cmd = generateRequest b env
-                    fmap (serializeResponse env) $ processRequest state logger riakPool cmd stats
+                    fmap (serializeResponse env) $ processRequest state logger chooser' cmd stats
                 case res of
                     Left (e :: SomeException) -> returnError (show e) $ msgid env
                     Right outenv -> cb $  messagePut outenv

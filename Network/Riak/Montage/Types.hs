@@ -33,6 +33,9 @@ class (Show a) => MontageRiakValue a where
     ensureEval r@(RiakMontagePb _ _) = r
     ensureEval _ = error "non lazy or pb passed to pb `eval`"
 
+class Poolable p where
+    chooser :: p -> Bucket -> Pool Connection
+
 instance (MontageRiakValue a) => Resolvable (RiakRecord a) where
     -- force deserialization for resolution
     resolve r1@(RiakMontageLazyBs _ _) r2 = resolve (ensureEval r1) r2
@@ -56,15 +59,11 @@ instance (MontageRiakValue a) => Show (RiakRecord a) where
     show (RiakMontageLazyBs b v) = showRiakRecord b v
     show (RiakMontagePb b v) = showRiakRecord b v
 
-data PoolSpec = PoolA -- bam etc, ssd
-              | PoolB -- boss, slower
-
 type SubType = L.ByteString
 type SubParam = Maybe L.ByteString
 
 data (MontageRiakValue r) => BucketSpec r = BucketSpec {
-          pool :: PoolSpec
-        , construct :: Constructor r
+          construct :: Constructor r
         , pbResolve :: Resolver r
         , subrequest :: Subrequestor r
         , deconstruct :: Deconstructor r
@@ -105,7 +104,7 @@ data (MontageRiakValue a) => RiakRequest a = RiakGet Bucket Key
 
 type RiakResponse a = Maybe (RiakRecord a, VClock, Maybe Int)
 
-type RiakPool = Bucket -> Pool Connection
+type PoolChooser = Bucket -> Pool Connection
 
 type RawValue = S.ByteString
 type Specifier = T.Text
