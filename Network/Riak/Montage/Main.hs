@@ -24,8 +24,8 @@ montageStats = [
 sleepForever :: IO a
 sleepForever = forever $ threadDelay (1000000 * 3600)
 
-runDaemon :: (MontageRiakValue a) => LogCallback -> T.Text -> RiakPool -> a -> IO ()
-runDaemon logger prefix chooser crap = do
+runDaemon :: (MontageRiakValue a, Poolable p) => LogCallback -> T.Text -> p -> a -> IO ()
+runDaemon logger prefix pools crap = do
     hSetBuffering stdout LineBuffering
     hSetBuffering stderr LineBuffering
 
@@ -34,7 +34,9 @@ runDaemon logger prefix chooser crap = do
 
     state <- newEmptyConcurrentState
 
-    void $ forkIO $ loggedSupervise logger "network-zeromq" $ serveMontageZmq crap state logger chooser stats
+    let chooser' = chooser pools
+
+    void $ forkIO $ loggedSupervise logger "network-zeromq" $ serveMontageZmq crap state logger chooser' stats
     void $ forkIO $ loggedSupervise logger "timekeeper" $ timeKeeper stats
     void $ forkIO $ runStats stats 3334
     sleepForever

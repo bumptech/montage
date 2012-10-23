@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleInstances  #-}
+{-# LANGUAGE OverloadedStrings #-}
 import Data.Conduit.Pool (Pool, createPool)
 import Network.Riak (defaultClient, connect, disconnect,
                     Client(port), Connection)
@@ -61,8 +61,22 @@ data ResObject = ResObjectUserInfo UserInfo
                | ResObjectUserName UserName
   deriving (Show)
 
-instance Poolable (Pool Connection) where
+data Pools = Pools {
+      poolA :: Pool Connection
+    , poolB :: Pool Connection
+  }
+
+-- multiple pools
+instance Poolable Pools where
+  chooser ps "u-info" = poolA ps
+  chooser ps "u-event" = poolA ps
+  chooser ps "u-name" = poolB ps
+
+-- single pool
+{-
+instance RiakPool (Pool Connection) ResObject where
   chooser p _ = p
+-}
 
 instance MontageRiakValue ResObject where
   getPB "u-info" = BucketSpec
@@ -115,9 +129,11 @@ messageGetError cls v =
 
 main :: IO ()
 main = do
-  mainPool <- generatePool "8087" 300
+  a <- generatePool "8087" 300
+  b <- generatePool "8187" 300
+  let pools = Pools { poolA = a, poolB = b }
 
   let crap = (ResObjectUserInfo $ UserInfo { uid = fromIntegral 1 } ) :: ResObject
                                                            -- sets the type inference
 
-  runDaemon simpleCallback "montage" mainPool crap
+  runDaemon simpleCallback "montage" pools crap

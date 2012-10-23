@@ -19,6 +19,7 @@ import qualified Network.Riak.Types as RT
 import Text.ProtocolBuffers.Basic (toUtf8, utf8)
 import qualified Data.Text.Encoding as E
 import Data.Foldable (toList)
+import qualified Data.ListLike as LL
 
 import qualified Network.Riak.Value as V
 import qualified Network.Riak.Content as C
@@ -35,7 +36,6 @@ import Network.Riak.Montage.Util
 import qualified Network.Riak.Montage.Proto.Montage.MontageGet as MG
 import qualified Network.Riak.Montage.Proto.Montage.MontageGetMany as MGM
 import qualified Network.Riak.Montage.Proto.Montage.MontageGetReference as MGR
-import qualified Network.Riak.Montage.Proto.Montage.MontageSetReference as MSR
 import qualified Network.Riak.Montage.Proto.Montage.MontagePut as MP
 import qualified Network.Riak.Montage.Proto.Montage.MontagePutMany as MPM
 import qualified Network.Riak.Montage.Proto.Montage.MontageObject as MO
@@ -154,21 +154,12 @@ generateRequest _ (MontageEnvelope MONTAGE_PUT_MANY inp _) =
         dat = fromJust $ V.fromContent buck $ C.empty { C.value = MO.data' g }
 
 generateRequest _ (MontageEnvelope MONTAGE_GET_REFERENCE inp _) =
-    ChainReference buck key targetBuck msub
+    ChainReference buck key targets
   where
     buck = MGR.bucket wrap
     key = MGR.key wrap
-    targetBuck = MGR.target_bucket wrap
-    msub = MGR.sub wrap
+    targets = LL.toList $ MGR.target_buckets wrap
     wrap = (fst . fromRight $ messageGet $ inp) :: MGR.MontageGetReference
-
-generateRequest _ (MontageEnvelope MONTAGE_SET_REFERENCE inp _) =
-    ChainReferenceSet buck key targetKey
-  where
-    buck = MSR.bucket wrap
-    key = MSR.key wrap
-    targetKey = MSR.target_key wrap
-    wrap = (fst . fromRight $ messageGet $ inp) :: MSR.MontageSetReference
 
 generateRequest _ (MontageEnvelope MONTAGE_DELETE inp _) =
     ChainDelete buck key Nothing
@@ -185,13 +176,13 @@ generateRequest _ (MontageEnvelope MONTAGE_ERROR _ _) = error "MONTAGE_ERROR is 
 generateRequest _ (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_DELETE_RESPONSE is reserved for responses from montage"
 
 
-processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> RiakPool -> ChainCommand r -> Stats -> IO CommandResponse
-processRequest state logger riakPool cmd stats = do
+processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
+processRequest state logger chooser' cmd stats = do
     mcount <- maybeIncrCount
     case mcount of
         Just count -> do
             logState count
-            finally (runWithTimeout (processRequest' logger riakPool cmd stats)) decrCount
+            finally (runWithTimeout (processRequest' logger chooser' cmd stats)) decrCount
         Nothing -> error "concurrency limit hit!" -- XXX return montage error
   where
     runWithTimeout actuallyRun = do
@@ -230,22 +221,22 @@ processRequest state logger riakPool cmd stats = do
                     ++ " rate=" ++ (show speed))
             Nothing -> return ()
 
-processRequest' :: (MontageRiakValue r) => LogCallback -> RiakPool -> ChainCommand r -> Stats -> IO CommandResponse
-processRequest' logger riakPool cmd stats = do
+processRequest' :: (MontageRiakValue r) => LogCallback -> PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
+processRequest' logger chooser' cmd stats = do
     let !step = exec cmd
     case step of
         IterationRiakCommand cmds callback -> do
-            rs <- runBackendCommands riakPool stats cmds
+            rs <- runBackendCommands chooser' stats cmds
             let !cmd' = callback rs
-            processRequest' logger riakPool cmd' stats
+            processRequest' logger chooser' cmd' stats
         IterationResponse final -> return final
         ChainIterationIO ioCmd -> do
             cmd' <- ioCmd
-            processRequest' logger riakPool cmd' stats
+            processRequest' logger chooser' cmd' stats
 
-runBackendCommands :: (MontageRiakValue r) => RiakPool -> Stats -> [RiakRequest r] -> IO [RiakResponse r]
-runBackendCommands riakPool stats rs = do
-    waits <- mapM (runBackendCommand riakPool stats) rs
+runBackendCommands :: (MontageRiakValue r) => PoolChooser -> Stats -> [RiakRequest r] -> IO [RiakResponse r]
+runBackendCommands chooser' stats rs = do
+    waits <- mapM (runBackendCommand chooser' stats) rs
     results <- mapM takeMVar waits
     return $ map parseResponse results
   where
@@ -259,15 +250,15 @@ runBackendCommand' f = do
     void $ forkIO $ try f >>= putMVar wait
     return wait
 
-runBackendCommand :: (MontageRiakValue r) => RiakPool -> Stats -> RiakRequest r -> IO (MVar (Either SomeException (RiakResponse r)))
-runBackendCommand riakPool stats (RiakGet buck key) =
-    runBackendCommand' $ doGet stats buck key riakPool
+runBackendCommand :: (MontageRiakValue r) => PoolChooser -> Stats -> RiakRequest r -> IO (MVar (Either SomeException (RiakResponse r)))
+runBackendCommand chooser' stats (RiakGet buck key) =
+    runBackendCommand' $ doGet stats buck key chooser'
 
-runBackendCommand riakPool _ (RiakPut mclock buck key value) =
-    runBackendCommand' $ doPut buck key mclock value riakPool
+runBackendCommand chooser' _ (RiakPut mclock buck key value) =
+    runBackendCommand' $ doPut buck key mclock value chooser'
 
-runBackendCommand riakPool _ (RiakDelete buck key) =
-    runBackendCommand' $ doDelete buck key riakPool
+runBackendCommand chooser' _ (RiakDelete buck key) =
+    runBackendCommand' $ doDelete buck key chooser'
 
 serializeResponse :: MontageEnvelope -> CommandResponse -> MontageEnvelope
 serializeResponse env (ResponseProtobuf code proto) =
