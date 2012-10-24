@@ -33,24 +33,19 @@ makeObject buck key (rec, vclock, resolutions) =
 
 
 exec :: ( MontageRiakValue r) => ChainCommand r -> ChainIteration r
-exec (ChainGet buck key msub mfollow) =
+exec (ChainGet buck key mfollow) =
     IterationRiakCommand [RiakGet buck key] $ fromMaybe finishGet mfollow
   where
     finishGet :: (MontageRiakValue r) => [RiakResponse r] -> ChainCommand r
     finishGet (mres:[]) =
         case mres of
-            Just resp@(val, _, _) -> let obj = (Just $ makeObject buck key resp) in
-                         case msub of
-                            Nothing -> ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
-                                            MontageGetResponse (Seq.fromList [EXISTS])
-                                            obj Seq.empty
-                            Just sub -> let RiakMontagePb _ pb = (ensureEval val) in
-                                        let dosubs = (subrequest $ getPB buck)
-                                                      pb (MSS.sub_spec sub) (MSS.params sub) in
-                                        ChainGetMany dosubs obj Nothing
-            Nothing            -> ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
-                MontageGetResponse (Seq.fromList [MISSING]) Nothing Seq.empty
+            Just resp@(val, _, _) -> getResp (Seq.fromList [EXISTS]) obj Seq.empty
+              where obj = (Just $ makeObject buck key resp)
+            Nothing -> getResp (Seq.fromList [MISSING]) Nothing Seq.empty
     finishGet _ = error "Got unexpected value back from Riak"
+
+    getResp status master subs = ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
+        MontageGetResponse status master subs
 
 exec (ChainPut vclock buck key rec mcallback) =
     IterationRiakCommand [RiakPut vclock buck key rec] $ fromMaybe finishPut mcallback

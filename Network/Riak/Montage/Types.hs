@@ -56,19 +56,14 @@ instance (MontageRiakValue a) => Show (RiakRecord a) where
     show (RiakMontageLazyBs b v) = showRiakRecord b v
     show (RiakMontagePb b v) = showRiakRecord b v
 
-type SubType = L.ByteString
-type SubParam = Maybe L.ByteString
-
 data (MontageRiakValue r) => BucketSpec r = BucketSpec {
           construct :: Constructor r
         , pbResolve :: Resolver r
-        , subrequest :: Subrequestor r
         , deconstruct :: Deconstructor r
         }
 
 type Constructor a = L.ByteString -> a
 type Resolver a = a -> a -> a
-type Subrequestor a = a -> SubType -> SubParam -> [(Bucket, Key)]
 type Deconstructor a = a -> L.ByteString
 
 type VectorClock = Maybe L.ByteString
@@ -89,7 +84,7 @@ instance Show CommandResponse where
     show (ResponseCustom t r) = "CommandResponseCustom [" ++ show t ++ "] " ++ show r
 
 data (MontageRiakValue r) => ChainCommand r =
-      ChainGet Bucket Key (Maybe MontageSubrequestSpec) (Maybe ([RiakResponse r] -> ChainCommand r))
+      ChainGet Bucket Key (Maybe ([RiakResponse r] -> ChainCommand r))
     | ChainGetMany [(Bucket, Key)] (Maybe MontageObject) (Maybe ([RiakResponse r] -> ChainCommand r))
     | ChainPut VectorClock Bucket Key (RiakRecord r) (Maybe ([RiakResponse r] -> ChainCommand r))
     | ChainPutMany [(VectorClock, Bucket, Key, RiakRecord r)] (Maybe ([RiakResponse r] -> ChainCommand r))
