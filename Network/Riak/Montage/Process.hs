@@ -67,7 +67,7 @@ newEmptyConcurrentState = ConcurrentState <$> newTVarIO 0 <*> newTVarIO 0 <*> ne
 
 -- TODO -- include subrequests as part of hash key?
 pipelineGet :: (MontageRiakValue t) => ConcurrentState -> ChainCommand t -> IO CommandResponse -> IO CommandResponse
-pipelineGet state (ChainGet buck key Nothing Nothing) actuallyRun = do
+pipelineGet state (ChainGet buck key Nothing) actuallyRun = do
     opt <- eitherAnswerOrMandate
     mans <- case opt of
         Left tmv -> do
@@ -106,12 +106,10 @@ fromRight (Left _) = error "fromRight got Left!"
 
 generateRequest :: (MontageRiakValue r) => r -> MontageEnvelope -> ChainCommand r
 generateRequest _ (MontageEnvelope MONTAGE_GET inp _) =
-    ChainGet buck key sub Nothing
+    ChainGet buck key Nothing
   where
     buck = MG.bucket obj
     key = MG.key obj
-    sub = MG.sub obj
-    -- XXX subrequest
     obj = (fst . fromRight $ messageGet $ inp) :: MG.MontageGet
 
 generateRequest _ (MontageEnvelope MONTAGE_GET_MANY inp _) =

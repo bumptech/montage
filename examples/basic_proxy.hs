@@ -68,17 +68,14 @@ instance MontageRiakValue ResObject where
   getPB "u-info" = BucketSpec
                    (ResObjectUserInfo . messageGetError "UserInfo")
                    lastWriteWins
-                   undefined
                    (\(ResObjectUserInfo o) -> messagePut o)
   getPB "u-event" = BucketSpec
                    (ResObjectUserEvent . messageGetError "UserEvent")
                    lastWriteWins
-                   undefined
                    (\(ResObjectUserEvent o) -> messagePut o)
   getPB "u-name" = BucketSpec
                    (ResObjectUserName . messageGetError "UserName")
                    lastWriteWins
-                   undefined
                    (\(ResObjectUserName o) -> messagePut o)
   getPB bucket = error $ B.unpack $ B.concat [ "No resolution function defined for bucket: ", bucket ]
 
