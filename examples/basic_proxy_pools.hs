@@ -19,11 +19,6 @@ import User.UserInfo as UI
 import User.UserEvent as UE
 import User.UserName as UN
 
--- Logging
-
-simpleCallback :: B.ByteString -> Maybe Double -> Value -> IO () -- :: LogCallback
-simpleCallback logType _ val = logError $ (B.unpack logType) ++ " " ++ show val
-
 -- Pool setup
 
 generatePool :: String -> Int -> IO (Pool Connection)
@@ -72,27 +67,18 @@ instance Poolable Pools where
   chooser ps "u-event" = poolA ps
   chooser ps "u-name" = poolB ps
 
--- single pool
-{-
-instance RiakPool (Pool Connection) ResObject where
-  chooser p _ = p
--}
-
 instance MontageRiakValue ResObject where
   getPB "u-info" = BucketSpec
                    (ResObjectUserInfo . messageGetError "UserInfo")
                    lastWriteWins
-                   undefined
                    (\(ResObjectUserInfo o) -> messagePut o)
   getPB "u-event" = BucketSpec
                    (ResObjectUserEvent . messageGetError "UserEvent")
                    lastWriteWins
-                   undefined
                    (\(ResObjectUserEvent o) -> messagePut o)
   getPB "u-name" = BucketSpec
                    (ResObjectUserName . messageGetError "UserName")
                    lastWriteWins
-                   undefined
                    (\(ResObjectUserName o) -> messagePut o)
   getPB bucket = error $ B.unpack $ B.concat [ "No resolution function defined for bucket: ", bucket ]
 
@@ -133,7 +119,4 @@ main = do
   b <- generatePool "8187" 300
   let pools = Pools { poolA = a, poolB = b }
 
-  let crap = (ResObjectUserInfo $ UserInfo { uid = fromIntegral 1 } ) :: ResObject
-                                                           -- sets the type inference
-
-  runDaemon simpleCallback "montage" pools crap
+  runDaemon (cfg :: Config ResObject) pools

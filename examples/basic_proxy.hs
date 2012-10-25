@@ -19,11 +19,6 @@ import User.UserInfo as UI
 import User.UserEvent as UE
 import User.UserName as UN
 
--- Logging
-
-simpleCallback :: B.ByteString -> Maybe Double -> Value -> IO () -- :: LogCallback
-simpleCallback logType _ val = logError $ (B.unpack logType) ++ " " ++ show val
-
 -- Pool setup
 
 generatePool :: String -> Int -> IO (Pool Connection)
@@ -113,8 +108,7 @@ messageGetError cls v =
 main :: IO ()
 main = do
   mainPool <- generatePool "8087" 300
-
-  let crap = (ResObjectUserInfo $ UserInfo { uid = fromIntegral 1 } ) :: ResObject
-                                                           -- sets the type inference
-
-  runDaemon simpleCallback "montage" mainPool crap
+  let cfg' = cfg { proxyPort = 7078 }
+             -- how to set the port
+             -- already default to 7078, so this does nothing
+  runDaemon (cfg' :: Config ResObject) mainPool
