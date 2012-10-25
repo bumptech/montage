@@ -10,6 +10,8 @@ module Network.Riak.Montage
         , ChainIteration(..)
         , RiakResponse
         , PoolChooser
+        , Config(..)
+        , cfg
         , runDaemon
         )
        where

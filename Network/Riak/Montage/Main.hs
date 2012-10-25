@@ -4,11 +4,12 @@ import System.IO (hSetBuffering, BufferMode(..), stdout, stderr)
 import Control.Monad (forever, void)
 import Control.Concurrent (forkIO, threadDelay)
 import qualified Data.Text as T
+import qualified Data.ByteString.Lazy.Char8 as B
 
 import Network.StatsWeb (initStats, addCounter, incCounter, runStats, Stats)
 
 import Network.Riak.Montage.Protocol
-import Network.Riak.Montage.Process (newEmptyConcurrentState)
+import Network.Riak.Montage.Process (newEmptyConcurrentState, generateRequest)
 import Network.Riak.Montage.Types
 import Network.Riak.Montage.Util
 
@@ -24,20 +25,33 @@ montageStats = [
 sleepForever :: IO a
 sleepForever = forever $ threadDelay (1000000 * 3600)
 
-runDaemon :: (MontageRiakValue a, Poolable p) => LogCallback -> T.Text -> p -> a -> IO ()
-runDaemon logger prefix pools crap = do
+simpleCallback :: LogCallback
+simpleCallback logType _ val = logError $ (B.unpack logType) ++ " " ++ show val
+
+cfg :: (MontageRiakValue a) => Config a
+cfg = Config {
+     proxyPort = 7078
+   , logger = simpleCallback
+   , statsPrefix = "montage"
+   , generator = generateRequest
+  }
+
+runDaemon :: (MontageRiakValue a, Poolable p) => Config a -> p -> IO ()
+runDaemon cfg' pools = do
     hSetBuffering stdout LineBuffering
     hSetBuffering stderr LineBuffering
 
-    stats <- initStats prefix
+    stats <- initStats (statsPrefix cfg')
     mapM_ (addCounter stats) montageStats
 
     state <- newEmptyConcurrentState
 
     let chooser' = chooser pools
+    let logging = logger cfg'
+    let runOn = "tcp://*:" ++ show (proxyPort cfg')
 
-    void $ forkIO $ loggedSupervise logger "network-zeromq" $ serveMontageZmq crap state logger chooser' stats
-    void $ forkIO $ loggedSupervise logger "timekeeper" $ timeKeeper stats
+    void $ forkIO $ loggedSupervise logging "network-zeromq" $ serveMontageZmq (generator cfg') runOn state logging chooser' stats
+    void $ forkIO $ loggedSupervise logging "timekeeper" $ timeKeeper stats
     void $ forkIO $ runStats stats 3334
     sleepForever
 

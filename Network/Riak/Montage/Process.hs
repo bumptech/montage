@@ -104,15 +104,15 @@ fromRight :: Either a b -> b
 fromRight (Right x) = x
 fromRight (Left _) = error "fromRight got Left!"
 
-generateRequest :: (MontageRiakValue r) => r -> MontageEnvelope -> ChainCommand r
-generateRequest _ (MontageEnvelope MONTAGE_GET inp _) =
+generateRequest :: (MontageRiakValue r) => MontageEnvelope -> ChainCommand r
+generateRequest (MontageEnvelope MONTAGE_GET inp _) =
     ChainGet buck key Nothing
   where
     buck = MG.bucket obj
     key = MG.key obj
     obj = (fst . fromRight $ messageGet $ inp) :: MG.MontageGet
 
-generateRequest _ (MontageEnvelope MONTAGE_GET_MANY inp _) =
+generateRequest (MontageEnvelope MONTAGE_GET_MANY inp _) =
     ChainGetMany gets Nothing Nothing
   where
     wrap = (fst . fromRight $ messageGet $ inp) :: MGM.MontageGetMany
@@ -124,14 +124,14 @@ generateRequest _ (MontageEnvelope MONTAGE_GET_MANY inp _) =
             buck = MG.bucket g
             key = MG.key g
 
-generateRequest _ (MontageEnvelope MONTAGE_COMMAND inp _) =
+generateRequest (MontageEnvelope MONTAGE_COMMAND inp _) =
     ChainCustom command arg
   where
     command = E.decodeUtf8 $ lTs $ utf8 $ MC.command obj
     arg = MC.argument obj
     obj = (fst . fromRight $ messageGet $ inp) :: MC.MontageCommand
 
-generateRequest _ (MontageEnvelope MONTAGE_PUT inp _) =
+generateRequest (MontageEnvelope MONTAGE_PUT inp _) =
     ChainPut vclock buck key dat Nothing
   where
     obj = MP.object wrap
@@ -141,7 +141,7 @@ generateRequest _ (MontageEnvelope MONTAGE_PUT inp _) =
     dat = fromJust $ V.fromContent buck $ C.empty { C.value = MO.data' obj }
     wrap = (fst . fromRight $ messageGet $ inp) :: MP.MontagePut
 
-generateRequest _ (MontageEnvelope MONTAGE_PUT_MANY inp _) =
+generateRequest (MontageEnvelope MONTAGE_PUT_MANY inp _) =
     ChainPutMany puts Nothing
   where
     pb = fst $ fromRight $ messageGet inp
@@ -151,7 +151,7 @@ generateRequest _ (MontageEnvelope MONTAGE_PUT_MANY inp _) =
         buck = MO.bucket g
         dat = fromJust $ V.fromContent buck $ C.empty { C.value = MO.data' g }
 
-generateRequest _ (MontageEnvelope MONTAGE_GET_REFERENCE inp _) =
+generateRequest (MontageEnvelope MONTAGE_GET_REFERENCE inp _) =
     ChainReference buck key targets
   where
     buck = MGR.bucket wrap
@@ -159,20 +159,20 @@ generateRequest _ (MontageEnvelope MONTAGE_GET_REFERENCE inp _) =
     targets = LL.toList $ MGR.target_buckets wrap
     wrap = (fst . fromRight $ messageGet $ inp) :: MGR.MontageGetReference
 
-generateRequest _ (MontageEnvelope MONTAGE_DELETE inp _) =
+generateRequest (MontageEnvelope MONTAGE_DELETE inp _) =
     ChainDelete buck key Nothing
   where
     buck = MD.bucket obj
     key = MD.key obj
     obj = (fst . fromRight $ messageGet $ inp) :: MD.MontageDelete
 
-generateRequest _ (MontageEnvelope MONTAGE_GET_RESPONSE _ _) = error "MONTAGE_GET_RESPONSE is reserved for responses from montage"
-generateRequest _ (MontageEnvelope MONTAGE_COMMAND_RESPONSE _ _) = error "MONTAGE_COMMAND_RESPONSE is reserved for responses from montage"
-generateRequest _ (MontageEnvelope MONTAGE_PUT_RESPONSE _ _) = error "MONTAGE_PUT_RESPONSE is reserved for responses from montage"
-generateRequest _ (MontageEnvelope MONTAGE_PUT_MANY_RESPONSE _ _) = error "MONTAGE_PUT_MANY_RESPONSE is reserved for responses from montage"
-generateRequest _ (MontageEnvelope MONTAGE_ERROR _ _) = error "MONTAGE_ERROR is reserved for responses from montage"
-generateRequest _ (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_DELETE_RESPONSE is reserved for responses from montage"
-generateRequest _ (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "DEPRICATED_MONTAGE_SET_REFERENCE is deprecated!"
+generateRequest (MontageEnvelope MONTAGE_GET_RESPONSE _ _) = error "MONTAGE_GET_RESPONSE is reserved for responses from montage"
+generateRequest (MontageEnvelope MONTAGE_COMMAND_RESPONSE _ _) = error "MONTAGE_COMMAND_RESPONSE is reserved for responses from montage"
+generateRequest (MontageEnvelope MONTAGE_PUT_RESPONSE _ _) = error "MONTAGE_PUT_RESPONSE is reserved for responses from montage"
+generateRequest (MontageEnvelope MONTAGE_PUT_MANY_RESPONSE _ _) = error "MONTAGE_PUT_MANY_RESPONSE is reserved for responses from montage"
+generateRequest (MontageEnvelope MONTAGE_ERROR _ _) = error "MONTAGE_ERROR is reserved for responses from montage"
+generateRequest (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_DELETE_RESPONSE is reserved for responses from montage"
+generateRequest (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "DEPRICATED_MONTAGE_SET_REFERENCE is deprecated!"
 
 
 processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse

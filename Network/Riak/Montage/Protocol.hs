@@ -19,7 +19,7 @@ import Network.Riak.Montage.Proto.Montage.MontageEnvelope as ME
 import Network.Riak.Montage.Proto.Montage.MontageWireMessages
 import Network.Riak.Montage.Proto.Montage.MontageError
 import Network.Riak.Montage.Types
-import Network.Riak.Montage.Process (generateRequest, processRequest,
+import Network.Riak.Montage.Process (processRequest,
                                     serializeResponse, ConcurrentState(..))
 
 
@@ -70,15 +70,18 @@ zmqRpcReply c inproc retid out = do
         send s retid []
         )
 
-serveMontageZmq :: (MontageRiakValue r) => r -> ConcurrentState -> LogCallback -> PoolChooser -> Stats -> IO ()
-serveMontageZmq b state logger chooser' stats = do
-    runZmqRpc "tcp://*:7078" wrapMontage
+serveMontageZmq :: (MontageRiakValue r) =>
+                   (MontageEnvelope -> ChainCommand r) ->
+                   String -> ConcurrentState -> LogCallback ->
+                   PoolChooser -> Stats -> IO ()
+serveMontageZmq generator runOn state logger chooser' stats = do
+    runZmqRpc runOn wrapMontage
   where
     wrapMontage m cb = do
         case messageGet $ sTl m of
             Right (env, x) | B.length x == 0 -> do
                 res <- try $ do
-                    let !cmd = generateRequest b env
+                    let !cmd = generator env
                     fmap (serializeResponse env) $ processRequest state logger chooser' cmd stats
                 case res of
                     Left (e :: SomeException) -> returnError (show e) $ msgid env
