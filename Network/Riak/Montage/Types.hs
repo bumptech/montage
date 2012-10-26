@@ -1,9 +1,12 @@
 module Network.Riak.Montage.Types where
 
+import Network.Riak.Montage.Util (LogCallback)
+
 import Network.Riak.Montage.Proto.Montage.MontageWireMessages
 import Text.ProtocolBuffers.WireMessage (Wire)
 import Text.ProtocolBuffers.Reflections (ReflectDescriptor)
 import Network.Riak.Montage.Proto.Montage.MontageSubrequestSpec
+import Network.Riak.Montage.Proto.Montage.MontageEnvelope
 import Network.Riak.Montage.Proto.Montage.MontageObject
 import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
@@ -109,3 +112,10 @@ type PoolChooser = Bucket -> Pool Connection
 type RawValue = S.ByteString
 type Specifier = T.Text
 type Argument = S.ByteString
+
+data (MontageRiakValue a) => Config a = Config {
+      proxyPort :: Int
+    , logger :: LogCallback
+    , statsPrefix :: T.Text
+    , generator :: (MontageEnvelope -> ChainCommand a)
+  }
