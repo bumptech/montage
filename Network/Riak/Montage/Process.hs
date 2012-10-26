@@ -11,6 +11,7 @@ import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 import System.Timeout (timeout)
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Data.Maybe (fromJust)
+import Data.Aeson ((.=), object)
 
 import qualified Data.HashMap.Strict as HM
 import Control.Applicative
@@ -182,7 +183,10 @@ processRequest state logger chooser' cmd stats = do
         Just count -> do
             logState count
             finally (runWithTimeout (processRequest' logger chooser' cmd stats)) decrCount
-        Nothing -> error "concurrency limit hit!" -- XXX return montage error
+        Nothing -> do
+            let errorText = "concurrency limit hit" :: String
+            logger "EXCEPTION" Nothing $ object ["error" .= errorText]
+            error errorText
   where
     runWithTimeout actuallyRun = do
         mr <- timeout requestTimeout (pipelineGet state cmd actuallyRun)
