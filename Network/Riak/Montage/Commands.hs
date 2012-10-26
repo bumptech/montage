@@ -15,7 +15,6 @@ import Network.Riak.Montage.Proto.Montage.MontageGetResponse
 import Network.Riak.Montage.Proto.Montage.MontagePutResponse
 import Network.Riak.Montage.Proto.Montage.MontagePutManyResponse
 import Network.Riak.Montage.Proto.Montage.MontageGetStatus
-import Network.Riak.Montage.Proto.Montage.MontageSubrequestSpec as MSS
 import Network.Riak.Montage.Proto.Montage.MontageDeleteResponse
 
 import Network.Riak.Montage.Types
@@ -39,13 +38,13 @@ exec (ChainGet buck key mfollow) =
     finishGet :: (MontageRiakValue r) => [RiakResponse r] -> ChainCommand r
     finishGet (mres:[]) =
         case mres of
-            Just resp@(val, _, _) -> getResp (Seq.fromList [EXISTS]) obj Seq.empty
+            Just resp -> getResp (Seq.fromList [EXISTS]) obj Seq.empty
               where obj = (Just $ makeObject buck key resp)
             Nothing -> getResp (Seq.fromList [MISSING]) Nothing Seq.empty
     finishGet _ = error "Got unexpected value back from Riak"
 
-    getResp status master subs = ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
-        MontageGetResponse status master subs
+    getResp status' master' subs' = ChainReturn $ ResponseProtobuf MONTAGE_GET_RESPONSE $
+        MontageGetResponse status' master' subs'
 
 exec (ChainPut vclock buck key rec mcallback) =
     IterationRiakCommand [RiakPut vclock buck key rec] $ fromMaybe finishPut mcallback

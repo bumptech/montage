@@ -5,7 +5,6 @@ import Network.Riak.Montage.Util (LogCallback)
 import Network.Riak.Montage.Proto.Montage.MontageWireMessages
 import Text.ProtocolBuffers.WireMessage (Wire)
 import Text.ProtocolBuffers.Reflections (ReflectDescriptor)
-import Network.Riak.Montage.Proto.Montage.MontageSubrequestSpec
 import Network.Riak.Montage.Proto.Montage.MontageEnvelope
 import Network.Riak.Montage.Proto.Montage.MontageObject
 import qualified Data.ByteString.Char8 as S

@@ -74,15 +74,15 @@ serveMontageZmq :: (MontageRiakValue r) =>
                    (MontageEnvelope -> ChainCommand r) ->
                    String -> ConcurrentState -> LogCallback ->
                    PoolChooser -> Stats -> IO ()
-serveMontageZmq generator runOn state logger chooser' stats = do
+serveMontageZmq generate runOn state logCB chooser' stats = do
     runZmqRpc runOn wrapMontage
   where
     wrapMontage m cb = do
         case messageGet $ sTl m of
             Right (env, x) | B.length x == 0 -> do
                 res <- try $ do
-                    let !cmd = generator env
-                    fmap (serializeResponse env) $ processRequest state logger chooser' cmd stats
+                    let !cmd = generate env
+                    fmap (serializeResponse env) $ processRequest state logCB chooser' cmd stats
                 case res of
                     Left (e :: SomeException) -> returnError (show e) $ msgid env
                     Right outenv -> cb $  messagePut outenv

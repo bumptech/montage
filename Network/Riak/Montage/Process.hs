@@ -177,15 +177,15 @@ generateRequest (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "
 
 
 processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
-processRequest state logger chooser' cmd stats = do
+processRequest state logCB chooser' cmd stats = do
     mcount <- maybeIncrCount
     case mcount of
         Just count -> do
             logState count
-            finally (runWithTimeout (processRequest' logger chooser' cmd stats)) decrCount
+            finally (runWithTimeout (processRequest' chooser' cmd stats)) decrCount
         Nothing -> do
             let errorText = "concurrency limit hit" :: String
-            logger "EXCEPTION" Nothing $ object ["error" .= errorText]
+            logCB "EXCEPTION" Nothing $ object ["error" .= errorText]
             error errorText
   where
     runWithTimeout actuallyRun = do
@@ -224,18 +224,18 @@ processRequest state logger chooser' cmd stats = do
                     ++ " rate=" ++ (show speed))
             Nothing -> return ()
 
-processRequest' :: (MontageRiakValue r) => LogCallback -> PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
-processRequest' logger chooser' cmd stats = do
+processRequest' :: (MontageRiakValue r) => PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
+processRequest' chooser' cmd stats = do
     let !step = exec cmd
     case step of
         IterationRiakCommand cmds callback -> do
             rs <- runBackendCommands chooser' stats cmds
             let !cmd' = callback rs
-            processRequest' logger chooser' cmd' stats
+            processRequest' chooser' cmd' stats
         IterationResponse final -> return final
         ChainIterationIO ioCmd -> do
             cmd' <- ioCmd
-            processRequest' logger chooser' cmd' stats
+            processRequest' chooser' cmd' stats
 
 runBackendCommands :: (MontageRiakValue r) => PoolChooser -> Stats -> [RiakRequest r] -> IO [RiakResponse r]
 runBackendCommands chooser' stats rs = do
