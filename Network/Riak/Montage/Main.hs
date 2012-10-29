@@ -13,6 +13,8 @@ import Network.Riak.Montage.Process (newEmptyConcurrentState, generateRequest)
 import Network.Riak.Montage.Types
 import Network.Riak.Montage.Util
 
+
+-- | Stats broadcast to localhost, port 3344
 montageStats :: [T.Text]
 montageStats = [
     "pulse"
@@ -28,6 +30,7 @@ sleepForever = forever $ threadDelay (1000000 * 3600)
 simpleCallback :: LogCallback
 simpleCallback logType _ val = logError $ (B.unpack logType) ++ " " ++ show val
 
+-- | Proxy configuration.  Configurable fields: proxyPort, logger, statsPrefix.  Non-configurable fields: generator.
 cfg :: (MontageRiakValue a) => Config a
 cfg = Config {
      proxyPort = 7078
@@ -36,6 +39,7 @@ cfg = Config {
    , generator = generateRequest
   }
 
+-- | Start the resolution proxy, where you define resolutions for your data @a@, and create one or more Riak connection pools @p@.
 runDaemon :: (MontageRiakValue a, Poolable p) => Config a -> p -> IO ()
 runDaemon cfg' pools = do
     hSetBuffering stdout LineBuffering
