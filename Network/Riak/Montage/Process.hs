@@ -255,7 +255,7 @@ runBackendCommand' f = do
 
 runBackendCommand :: (MontageRiakValue r) => PoolChooser -> Stats -> RiakRequest r -> IO (MVar (Either SomeException (RiakResponse r)))
 runBackendCommand chooser' stats (RiakGet buck key) =
-    runBackendCommand' $ doGet stats buck key chooser'
+    runBackendCommand' $ doGet stats buck key chooser' $ opts $ getPB buck
 
 runBackendCommand chooser' _ (RiakPut mclock buck key value) =
     runBackendCommand' $ doPut buck key mclock value chooser'

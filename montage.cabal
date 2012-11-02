@@ -1,5 +1,5 @@
 Name:                montage
-Version:             0.1
+Version:             0.2
 Synopsis:            Riak Resolution Proxy
 Homepage:            http://github.com/bumptech/montage
 License:             BSD3
@@ -50,7 +50,7 @@ Library
                   text>=0.11,
                   ListLike,
                   stm>=2.2,
-                  riak-bump>=0.7.3.4,
+                  riak-bump>=0.7.3.5,
                   pool-conduit>=0.1.0.2&&<0.2,
                   unordered-containers >= 0.2.1 && < 0.3,
                   zeromq-haskell>=0.8 && < 0.9,

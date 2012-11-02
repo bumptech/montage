@@ -17,6 +17,8 @@ module Network.Riak.Montage
         , MontageRiakValue(..)
         , Poolable(..)
         , BucketSpec(..)
+        , BucketOpts(..)
+        , defaultBucketOpts
         , ChainCommand(..)
         , RiakRequest(..)
         , RiakRecord(..)
