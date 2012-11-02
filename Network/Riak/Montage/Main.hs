@@ -8,6 +8,10 @@ import qualified Data.ByteString.Lazy.Char8 as B
 
 import Network.StatsWeb (initStats, addCounter, incCounter, runStats, Stats)
 
+import Data.Conduit.Pool (Pool, createPool)
+import Network.Riak (defaultClient, connect, disconnect,
+                    Client(port), Connection)
+
 import Network.Riak.Montage.Protocol
 import Network.Riak.Montage.Process (newEmptyConcurrentState, generateRequest)
 import Network.Riak.Montage.Types
@@ -38,6 +42,16 @@ cfg = Config {
    , statsPrefix = "montage"
    , generator = generateRequest
   }
+
+-- | Create a pool of Riak connection (usually used for constructing the second argument of @runDaemon@), given a port and a max number of connections.
+riakPoolOnPort :: String -> Int -> IO (Pool Connection)
+riakPoolOnPort port' count =
+    createPool
+        (connect $ defaultClient {port = port'})
+        disconnect
+        1  -- stripes
+        10 -- timeout
+        count -- max connections
 
 -- | Start the resolution proxy, where you define resolutions for your data @a@, and create one or more Riak connection pools @p@.
 runDaemon :: (MontageRiakValue a, Poolable p) => Config a -> p -> IO ()

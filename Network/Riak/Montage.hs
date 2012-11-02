@@ -23,15 +23,23 @@ module Network.Riak.Montage
         , CommandResponse(..)
         , ChainIteration(..)
         , RiakResponse
+        , evalRiakResponse
         , PoolChooser
+        , Bucket
+        , VClock
+        , fromVClock
         , Config(..)
         , LogCallback
+        , riakPoolOnPort
+        , Connection
         )
        where
 
 import Network.Riak.Montage.Main
 import Network.Riak.Montage.Types
 import Network.Riak.Montage.Util
+import Network.Riak.Types (Bucket, VClock, fromVClock)
+import Network.Riak (Connection)
 
 -- $montageRiakValue
 -- You define your resolutions by saying that your concrete type, ResObject here, is a instance of the 'MontageRiakValue' typeclass:

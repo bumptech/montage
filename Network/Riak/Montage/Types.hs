@@ -73,6 +73,14 @@ type VectorClock = Maybe L.ByteString
 data (MontageRiakValue r) => RiakRecord r = RiakMontageLazyBs Bucket L.ByteString
                                           | RiakMontagePb Bucket r
 
+
+evalRiakResponse :: (MontageRiakValue a) => RiakResponse a -> RiakResponse a
+evalRiakResponse = fmap eval
+  where
+    eval :: (MontageRiakValue a) => (RiakRecord a, VClock, Maybe Int) -> (RiakRecord a, VClock, Maybe Int)
+    eval (b, v, mc) = (ensureEval b, v, mc)
+
+
 data (MontageRiakValue r) => ChainIteration r =
       IterationRiakCommand [RiakRequest r] ([RiakResponse r] -> ChainCommand r)
     | IterationResponse CommandResponse
