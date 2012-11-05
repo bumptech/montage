@@ -33,23 +33,26 @@ retryOperation op =
             retryOperation' $ retries + 1
 
 doGet :: (MontageRiakValue r) => Stats -> Bucket -> Key -> PoolChooser -> IO (RiakResponse r)
-doGet stats buck key chooser' = do
-  res <- retryOperation $ withResource (chooser' buck) $ \c -> getWithLength c buck key Default
-  case res of
-    Just ((resolved, siblings), v) -> do
-        let resolvedLength = L.length $ riakSerialize resolved
-        when (siblings > 10) $ incCounter "requests.many.siblings" stats
-        when (resolvedLength > 1097152) $ incCounter "requests.big" stats
-        return $ Just (resolved, v, Just siblings)
-    Nothing -> return Nothing
+doGet stats buck key chooser' = doGet' $ chooser' buck
+  where
+    doGet' (p:ps) = do
+        res <- retryOperation $ withResource p $ \c -> getWithLength c buck key Default
+        case res of
+            Just ((resolved, siblings), v) -> do
+                let resolvedLength = L.length $ riakSerialize resolved
+                when (siblings > 10) $ incCounter "requests.many.siblings" stats
+                when (resolvedLength > 1097152) $ incCounter "requests.big" stats
+                return $ Just (resolved, v, Just siblings)
+            Nothing -> doGet' ps
+    doGet' [] = return Nothing
 
 doPut :: (MontageRiakValue r) => Bucket -> Key -> VectorClock -> RiakRecord r -> PoolChooser -> IO (RiakResponse r)
 doPut buck key mvc rec chooser' = do
   let riakvc = fmap VClock mvc
-  res <- retryOperation $ withResource (chooser' buck) $ \c -> (fmap Just $ put c buck key riakvc rec (Just 1) Default Default)
+  res <- retryOperation $ withResource (Prelude.head $ chooser' buck) $ \c -> (fmap Just $ put c buck key riakvc rec (Just 1) Default Default)
   return $ fmap (\(r, v) -> (r, v, Nothing)) res
 
 doDelete :: (MontageRiakValue a) => Bucket -> Key -> PoolChooser -> IO (RiakResponse a)
 doDelete buck key chooser' = do
-  void $ retryOperation $ withResource (chooser' buck) $ (\c -> delete c buck key Default >> return Nothing)
+  void $ retryOperation $ withResource (Prelude.head $ chooser' buck) $ (\c -> delete c buck key Default >> return Nothing)
   return Nothing

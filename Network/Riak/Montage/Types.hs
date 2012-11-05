@@ -34,7 +34,7 @@ class (Show a) => MontageRiakValue a where
     ensureEval r@(RiakMontagePb _ _) = r
 
 class Poolable p where
-    chooser :: p -> Bucket -> Pool Connection
+    chooser :: p -> Bucket -> [Pool Connection]
 
 instance (MontageRiakValue a) => Resolvable (RiakRecord a) where
     -- force deserialization for resolution
@@ -106,7 +106,7 @@ data (MontageRiakValue a) => RiakRequest a = RiakGet Bucket Key
 
 type RiakResponse a = Maybe (RiakRecord a, VClock, Maybe Int)
 
-type PoolChooser = Bucket -> Pool Connection
+type PoolChooser = Bucket -> [Pool Connection]
 
 type RawValue = S.ByteString
 type Specifier = T.Text

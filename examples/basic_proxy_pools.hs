@@ -63,9 +63,9 @@ data Pools = Pools {
 
 -- multiple pools
 instance Poolable Pools where
-  chooser ps "u-info" = poolA ps
-  chooser ps "u-event" = poolA ps
-  chooser ps "u-name" = poolB ps
+  chooser ps "u-info" = [poolA ps]
+  chooser ps "u-event" = [poolA ps]
+  chooser ps "u-name" = [poolB ps]
 
 instance MontageRiakValue ResObject where
   getPB "u-info" = BucketSpec

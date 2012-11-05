@@ -57,7 +57,7 @@ data ResObject = ResObjectUserInfo UserInfo
   deriving (Show)
 
 instance Poolable (Pool Connection) where
-  chooser p _ = p
+  chooser p _ = [p]
 
 instance MontageRiakValue ResObject where
   getPB "u-info" = BucketSpec
