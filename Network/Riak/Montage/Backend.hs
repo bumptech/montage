@@ -6,7 +6,7 @@ import Control.Exception (catch, throw, SomeException(..))
 import Control.Concurrent (threadDelay)
 import Data.ByteString.Lazy as L
 import Network.Riak.Types
-import Network.Riak.Value.Resolvable (getWithLength, put, delete)
+import Network.Riak.Value.Resolvable (getWithLengthOpt, put, delete)
 
 import Network.StatsWeb (Stats, incCounter)
 
@@ -32,11 +32,11 @@ retryOperation op =
             threadDelay $ 100000 * retries
             retryOperation' $ retries + 1
 
-doGet :: (MontageRiakValue r) => Stats -> Bucket -> Key -> PoolChooser -> IO (RiakResponse r)
-doGet stats buck key chooser' = doGet' $ chooser' buck
+doGet :: (MontageRiakValue r) => Stats -> Bucket -> Key -> PoolChooser -> BucketOpts r -> IO (RiakResponse r)
+doGet stats buck key chooser' opts' = doGet' $ chooser' buck
   where
     doGet' (p:ps) = do
-        res <- retryOperation $ withResource p $ \c -> getWithLength c buck key Default
+        res <- retryOperation $ withResource p $ \c -> getWithLengthOpt c buck key Default (basic_quorum opts') (notfound_ok opts')
         case res of
             Just ((resolved, siblings), v) -> do
                 let resolvedLength = L.length $ riakSerialize resolved

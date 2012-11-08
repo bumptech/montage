@@ -62,7 +62,16 @@ data (MontageRiakValue r) => BucketSpec r = BucketSpec {
           construct :: Constructor r
         , pbResolve :: Resolver r
         , deconstruct :: Deconstructor r
+        , opts :: BucketOpts r
         }
+
+data (MontageRiakValue r) => BucketOpts r = BucketOpts {
+      basic_quorum :: Maybe Bool
+    , notfound_ok :: Maybe Bool
+    }
+
+defaultBucketOpts :: (MontageRiakValue r) => BucketOpts r
+defaultBucketOpts = BucketOpts Nothing Nothing
 
 type Constructor a = L.ByteString -> a
 type Resolver a = a -> a -> a
@@ -72,6 +81,14 @@ type VectorClock = Maybe L.ByteString
 
 data (MontageRiakValue r) => RiakRecord r = RiakMontageLazyBs Bucket L.ByteString
                                           | RiakMontagePb Bucket r
+
+
+evalRiakResponse :: (MontageRiakValue a) => RiakResponse a -> RiakResponse a
+evalRiakResponse = fmap eval
+  where
+    eval :: (MontageRiakValue a) => (RiakRecord a, VClock, Maybe Int) -> (RiakRecord a, VClock, Maybe Int)
+    eval (b, v, mc) = (ensureEval b, v, mc)
+
 
 data (MontageRiakValue r) => ChainIteration r =
       IterationRiakCommand [RiakRequest r] ([RiakResponse r] -> ChainCommand r)
