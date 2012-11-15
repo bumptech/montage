@@ -134,4 +134,5 @@ data (MontageRiakValue a) => Config a = Config {
     , logger :: LogCallback
     , statsPrefix :: T.Text
     , generator :: (MontageEnvelope -> ChainCommand a)
+    , maxRequests :: Int
   }

@@ -44,10 +44,6 @@ import qualified Network.Riak.Montage.Proto.Montage.MontageCommand as MC
 import qualified Network.Riak.Montage.Proto.Montage.MontageCommandResponse as MCR
 import qualified Network.Riak.Montage.Proto.Montage.MontageDelete as MD
 
--- maxRequests is maximum pending requests before errors are raised
-maxRequests :: Int
-maxRequests = 500
-
 -- how many requests before printing stats?
 statsEvery :: Int
 statsEvery = 100
@@ -176,8 +172,8 @@ generateRequest (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_D
 generateRequest (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "DEPRICATED_MONTAGE_SET_REFERENCE is deprecated!"
 
 
-processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
-processRequest state logCB chooser' cmd stats = do
+processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> Int -> IO CommandResponse
+processRequest state logCB chooser' cmd stats maxRequests' = do
     mcount <- maybeIncrCount
     case mcount of
         Just count -> do
@@ -198,7 +194,7 @@ processRequest state logCB chooser' cmd stats = do
 
     maybeIncrCount = atomically $ do
         count <- readTVar (concurrentCount state)
-        if (count < maxRequests)
+        if (count < maxRequests')
         then (writeTVar (concurrentCount state) (count + 1) >> return (Just $ count + 1))
         else (return Nothing)
 
