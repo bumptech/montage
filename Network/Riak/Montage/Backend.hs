@@ -1,6 +1,5 @@
 module Network.Riak.Montage.Backend where
 
-import Prelude hiding (catch)
 import Control.Monad (void, when)
 import Control.Exception (catch, throw, SomeException(..))
 import Control.Concurrent (threadDelay)
