@@ -57,7 +57,8 @@ Library
                   protocol-buffers >= 2.0.11,
                   protocol-buffers-descriptor >= 2.0.11,
                   stats-web,
-                  safe
+                  safe,
+                  stm-stats
 
   Extensions: OverloadedStrings,DeriveDataTypeable
   Extensions: FlexibleInstances,DoAndIfThenElse,ScopedTypeVariables
