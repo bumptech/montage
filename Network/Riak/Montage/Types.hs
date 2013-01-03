@@ -114,6 +114,11 @@ data (MontageRiakValue r) => ChainCommand r =
     | ChainCommandIO (IO (ChainCommand r))
 
 instance (MontageRiakValue r) => Show (ChainCommand r) where
+    show (ChainGet b k _) = L.unpack $ L.concat ["ChainGet: ", b, " ", k]
+    show (ChainGetMany bks _ _) = "ChainGetMany: " ++ show bks
+    show (ChainPut _ b k v _) = "ChainPut: " ++ show v ++ " -> " ++ L.unpack b ++ " " ++ L.unpack k
+    show (ChainPutMany vs _) = "ChainPutMany: " ++ (show $ map (\(_, b, k, v) -> show v ++ " -> " ++ L.unpack b ++ " " ++ L.unpack k) vs)
+    show (ChainDelete b k _) = L.unpack $ L.concat ["ChainDelete: ", b, " ", k]
     show (ChainCommandIO _) = "Can't show things inside the IO monad"
     show v = show v
 
