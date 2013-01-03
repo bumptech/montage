@@ -173,10 +173,13 @@ generateRequest (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_D
 generateRequest (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "DEPRICATED_MONTAGE_SET_REFERENCE is deprecated!"
 
 
-processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> Int -> Bool -> IO CommandResponse
-processRequest state logCB chooser' cmd stats maxRequests' readOnly' = do
+processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> Int -> Bool -> Bool -> IO CommandResponse
+processRequest state logCB chooser' cmd stats maxRequests' readOnly' logCommands' = do
     when (readOnly' && (not $ isRead cmd)) $
       error "Non-read request issued to read-only montage"
+
+    when (logCommands') $
+      logError $ "Running command " ++ show cmd
 
     mcount <- maybeIncrCount
     case mcount of
