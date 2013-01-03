@@ -135,4 +135,5 @@ data (MontageRiakValue a) => Config a = Config {
     , statsPrefix :: T.Text
     , generator :: (MontageEnvelope -> ChainCommand a)
     , maxRequests :: Int
+    , readOnly :: Bool
   }

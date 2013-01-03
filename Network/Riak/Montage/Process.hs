@@ -1,6 +1,6 @@
 module Network.Riak.Montage.Process where
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, takeMVar, putMVar, MVar)
 import Control.Concurrent.STM (newTVarIO)
@@ -173,8 +173,11 @@ generateRequest (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_D
 generateRequest (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "DEPRICATED_MONTAGE_SET_REFERENCE is deprecated!"
 
 
-processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> Int -> IO CommandResponse
-processRequest state logCB chooser' cmd stats maxRequests' = do
+processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> Int -> Bool -> IO CommandResponse
+processRequest state logCB chooser' cmd stats maxRequests' readOnly' = do
+    when (readOnly' && (not $ isRead cmd)) $
+      error "Non-read request issued to read-only montage"
+
     mcount <- maybeIncrCount
     case mcount of
         Just count -> do
@@ -192,6 +195,11 @@ processRequest state logCB chooser' cmd stats maxRequests' = do
                 return r
             Nothing -> do
                 error "montage request timeout!"
+
+    isRead :: (MontageRiakValue r) => ChainCommand r -> Bool
+    isRead (ChainGet _ _ _) = True
+    isRead (ChainGetMany _ _ _) = True
+    isRead _ = False
 
     maybeIncrCount = trackNamedSTM "maybeIncCount" $ do
         count <- readTVar (concurrentCount state)

@@ -73,8 +73,8 @@ zmqRpcReply c inproc retid out = do
 serveMontageZmq :: (MontageRiakValue r) =>
                    (MontageEnvelope -> ChainCommand r) ->
                    String -> ConcurrentState -> LogCallback ->
-                   PoolChooser -> Stats -> Int -> IO ()
-serveMontageZmq generate runOn state logCB chooser' stats maxRequests' = do
+                   PoolChooser -> Stats -> Int -> Bool -> IO ()
+serveMontageZmq generate runOn state logCB chooser' stats maxRequests' readOnly' = do
     runZmqRpc runOn wrapMontage
   where
     wrapMontage m cb = do
@@ -82,7 +82,7 @@ serveMontageZmq generate runOn state logCB chooser' stats maxRequests' = do
             Right (env, x) | B.length x == 0 -> do
                 res <- try $ do
                     let !cmd = generate env
-                    fmap (serializeResponse env) $ processRequest state logCB chooser' cmd stats maxRequests'
+                    fmap (serializeResponse env) $ processRequest state logCB chooser' cmd stats maxRequests' readOnly'
                 case res of
                     Left (e :: SomeException) -> returnError (show e) $ msgid env
                     Right outenv -> cb $  messagePut outenv
