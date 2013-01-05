@@ -40,6 +40,7 @@ cfg = Config {
      proxyPort = 7078
    , logger = simpleCallback
    , statsPrefix = "montage"
+   , statsPort = 3334
    , generator = generateRequest
    , maxRequests = 700
    , readOnly = False
@@ -73,7 +74,7 @@ runDaemon cfg' pools = do
 
     void $ forkIO $ loggedSupervise logging "network-zeromq" $ serveMontageZmq (generator cfg') runOn state logging chooser' stats (maxRequests cfg') (readOnly cfg') (logCommands cfg')
     void $ forkIO $ loggedSupervise logging "timekeeper" $ timeKeeper stats
-    void $ forkIO $ runStats stats 3334
+    void $ forkIO $ runStats stats (statsPort cfg')
     sleepForever
 
 timeKeeper :: Stats -> IO a

@@ -138,6 +138,7 @@ data (MontageRiakValue a) => Config a = Config {
       proxyPort :: Int
     , logger :: LogCallback
     , statsPrefix :: T.Text
+    , statsPort :: Int
     , generator :: (MontageEnvelope -> ChainCommand a)
     , maxRequests :: Int
     , readOnly :: Bool
