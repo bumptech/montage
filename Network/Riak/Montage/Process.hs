@@ -199,11 +199,6 @@ processRequest state logCB chooser' cmd stats maxRequests' readOnly' logCommands
             Nothing -> do
                 error "montage request timeout!"
 
-    isRead :: (MontageRiakValue r) => ChainCommand r -> Bool
-    isRead (ChainGet _ _ _) = True
-    isRead (ChainGetMany _ _ _) = True
-    isRead _ = False
-
     maybeIncrCount = trackNamedSTM "maybeIncCount" $ do
         count <- readTVar (concurrentCount state)
         if (count < maxRequests')

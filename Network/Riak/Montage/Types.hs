@@ -25,6 +25,11 @@ class (Show a) => MontageRiakValue a where
     customCommandHandler :: T.Text -> Maybe L.ByteString -> ChainIteration a
     customCommandHandler cmd = error $ "No handler for custom command: " ++ T.unpack cmd
 
+    isRead :: ChainCommand a -> Bool
+    isRead (ChainGet _ _ _) = True
+    isRead (ChainGetMany _ _ _) = True
+    isRead _ = False
+
     riakSerialize :: RiakRecord a -> L.ByteString
     riakSerialize (RiakMontageLazyBs _ bs) = bs
     riakSerialize (RiakMontagePb b v) = (deconstruct $ getPB b) v
