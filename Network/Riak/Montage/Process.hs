@@ -69,7 +69,7 @@ pipelineGet state (ChainGet buck key Nothing) actuallyRun = do
     opt <- eitherAnswerOrMandate
     mans <- case opt of
         Left tmv -> do
-            mans <- try actuallyRun
+            mans <- try $ runWithTimeout actuallyRun
             trackNamedSTM "non-pipelined" $ do
                 putTMVar tmv mans
                 hash <- readTVar (pipeline state)
@@ -78,12 +78,20 @@ pipelineGet state (ChainGet buck key Nothing) actuallyRun = do
             return mans
         Right tmv -> do
             logError $ "(key request for " ++ (show buck) ++ "/" ++ (show key) ++ " is pipelined)"
-            trackNamedSTM "pipelined" $ readTMVar tmv
+            runWithTimeout $ trackNamedSTM "pipelined" $ readTMVar tmv
 
     case mans of
         Left (e::SomeException) -> throw e
         Right ans -> return ans
   where
+    runWithTimeout action = do
+        mr <- timeout requestTimeout action
+        case mr of
+            Just r -> do
+                return r
+            Nothing -> do
+                error "montage request timeout!"
+
     eitherAnswerOrMandate = trackNamedSTM "eitherAnswerOrMandate" $ do
         hash <- readTVar (pipeline state)
         case HM.lookup hashkey hash of
@@ -185,20 +193,12 @@ processRequest state logCB chooser' cmd stats maxRequests' readOnly' logCommands
     case mcount of
         Just count -> do
             logState count
-            finally (runWithTimeout (processRequest' chooser' cmd stats)) decrCount
+            finally (pipelineGet state cmd (processRequest' chooser' cmd stats)) decrCount
         Nothing -> do
             let errorText = "concurrency limit hit" :: String
             logCB "EXCEPTION" Nothing $ object ["error" .= errorText]
             error errorText
   where
-    runWithTimeout actuallyRun = do
-        mr <- timeout requestTimeout (pipelineGet state cmd actuallyRun)
-        case mr of
-            Just r -> do
-                return r
-            Nothing -> do
-                error "montage request timeout!"
-
     maybeIncrCount = trackNamedSTM "maybeIncCount" $ do
         count <- readTVar (concurrentCount state)
         if (count < maxRequests')
