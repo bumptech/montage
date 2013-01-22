@@ -10,6 +10,7 @@ import qualified Data.ByteString.Char8 as S
 import Control.Exception (try, SomeException)
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 import Text.ProtocolBuffers.Basic (uFromString)
+import Data.Aeson (object, (.=))
 
 import Network.Riak.Montage.Util
 
@@ -82,7 +83,7 @@ serveMontageZmq generate runOn state logCB chooser' stats maxRequests' readOnly'
             Right (env, x) | B.length x == 0 -> do
                 res <- try $ do
                     let !cmd = generate env
-                    fmap (serializeResponse env) $ processRequest state logCB chooser' cmd stats maxRequests' readOnly' logCommands'
+                    fmap (serializeResponse env) $ processRequest state chooser' cmd stats maxRequests' readOnly' logCommands'
                 case res of
                     Left (e :: SomeException) -> returnError (show e) $ msgid env
                     Right outenv -> cb $  messagePut outenv
@@ -91,6 +92,7 @@ serveMontageZmq generate runOn state logCB chooser' stats maxRequests' readOnly'
       where
         returnError err msgid' = do
             logError err
+            logCB "EXCEPTION" Nothing $ object ["error" .=  err ]
             cb $ messagePut $ MontageEnvelope {
                   mtype = MONTAGE_ERROR
                 , msg = messagePut $ MontageError (uFromString err)
