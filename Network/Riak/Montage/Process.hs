@@ -12,7 +12,6 @@ import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 import System.Timeout (timeout)
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Data.Maybe (fromJust)
-import Data.Aeson ((.=), object)
 
 import qualified Data.HashMap.Strict as HM
 import Control.Applicative
@@ -63,7 +62,6 @@ data ConcurrentState = ConcurrentState {
 newEmptyConcurrentState :: IO ConcurrentState
 newEmptyConcurrentState = ConcurrentState <$> newTVarIO 0 <*> newTVarIO 0 <*> newTVarIO 0 <*> newTVarIO HM.empty
 
--- TODO -- include subrequests as part of hash key?
 pipelineGet :: (MontageRiakValue t) => ConcurrentState -> ChainCommand t
             -> (IO CommandResponse -> IO CommandResponse)
             -> IO CommandResponse -> IO CommandResponse
@@ -109,18 +107,15 @@ runWithTimeout action = do
         Nothing -> do
             error "montage request timeout!"
 
-trackConcurrency :: ConcurrentState -> Int -> LogCallback -> IO CommandResponse
+trackConcurrency :: ConcurrentState -> Int -> IO CommandResponse
                  -> IO CommandResponse
-trackConcurrency state maxRequests' logCB action = do
+trackConcurrency state maxRequests' action = do
     mcount <- maybeIncrCount
     case mcount of
         Just count -> do
             logState count
             finally action decrCount
-        Nothing -> do
-            let errorText = "concurrency limit hit" :: String
-            logCB "EXCEPTION" Nothing $ object ["error" .= errorText]
-            error errorText
+        Nothing -> error "concurrency limit hit"
   where
     maybeIncrCount = trackNamedSTM "maybeIncCount" $ do
         count <- readTVar (concurrentCount state)
@@ -225,8 +220,8 @@ generateRequest (MontageEnvelope MONTAGE_ERROR _ _) = error "MONTAGE_ERROR is re
 generateRequest (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_DELETE_RESPONSE is reserved for responses from montage"
 generateRequest (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "DEPRICATED_MONTAGE_SET_REFERENCE is deprecated!"
 
-processRequest :: (MontageRiakValue r) => ConcurrentState -> LogCallback -> PoolChooser -> ChainCommand r -> Stats -> Int -> Bool -> Bool -> IO CommandResponse
-processRequest state logCB chooser' cmd stats maxRequests' readOnly' logCommands' = do
+processRequest :: (MontageRiakValue r) => ConcurrentState -> PoolChooser -> ChainCommand r -> Stats -> Int -> Bool -> Bool -> IO CommandResponse
+processRequest state chooser' cmd stats maxRequests' readOnly' logCommands' = do
     when (readOnly' && (not $ isRead cmd)) $
       error "Non-read request issued to read-only montage"
 
@@ -235,7 +230,7 @@ processRequest state logCB chooser' cmd stats maxRequests' readOnly' logCommands
 
     pipelineGet state cmd tracker (processRequest' chooser' cmd stats)
   where
-    tracker = trackConcurrency state maxRequests' logCB
+    tracker = trackConcurrency state maxRequests'
 
 processRequest' :: (MontageRiakValue r) => PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
 processRequest' chooser' cmd stats = do
