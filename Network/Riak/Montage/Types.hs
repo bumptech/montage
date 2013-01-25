@@ -11,7 +11,7 @@ import qualified Data.ByteString.Char8 as S
 import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.Text as T
 import Network.Riak.Types
-import Data.Conduit.Pool (Pool)
+import Data.Pool (Pool)
 
 import Network.Riak (Resolvable(..))
 import qualified Network.Riak.Value as V

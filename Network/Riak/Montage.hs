@@ -33,6 +33,7 @@ module Network.Riak.Montage
         , Config(..)
         , LogCallback
         , riakPoolOnPort
+        , riakPoolOnPort'
         , Connection
         )
        where

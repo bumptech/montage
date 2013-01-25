@@ -51,7 +51,7 @@ Library
                   ListLike,
                   stm>=2.2,
                   riak-bump>=0.7.3.6,
-                  pool-conduit>=0.1.0.2&&<0.2,
+                  bump-resource-pool,
                   unordered-containers >= 0.2.1 && < 0.3,
                   zeromq-haskell>=0.8 && < 0.9,
                   protocol-buffers >= 2.0.11,

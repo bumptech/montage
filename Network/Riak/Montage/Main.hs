@@ -8,7 +8,7 @@ import qualified Data.ByteString.Lazy.Char8 as B
 
 import Network.StatsWeb (initStats, addCounter, incCounter, runStats, Stats)
 
-import Data.Conduit.Pool (Pool, createPool)
+import Data.Pool (Pool, createPool')
 import Network.Riak (defaultClient, connect, disconnect,
                     Client(port), Connection)
 
@@ -49,12 +49,17 @@ cfg = Config {
 
 -- | Create a pool of Riak connection (usually used for constructing the second argument of @runDaemon@), given a port and a max number of connections.
 riakPoolOnPort :: String -> Int -> IO (Pool Connection)
-riakPoolOnPort port' count =
-    createPool
+riakPoolOnPort port' count = riakPoolOnPort' port' count 0
+
+-- | Use tracking as the number of seconds delay before calculating pool resource and stm stats.  Stats written to stderr.
+riakPoolOnPort' :: String -> Int -> Int -> IO (Pool Connection)
+riakPoolOnPort' port' count tracking =
+    createPool'
         (connect $ defaultClient {port = port'})
         disconnect
         1  -- stripes
         10 -- timeout
+        tracking -- tracking turned on if non zero
         count -- max connections
 
 -- | Start the resolution proxy, where you define resolutions for your data @a@, and create one or more Riak connection pools @p@.

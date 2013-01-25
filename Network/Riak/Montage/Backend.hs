@@ -10,7 +10,7 @@ import Network.Riak.Value.Resolvable (getWithLengthOpt, put, delete)
 import Network.StatsWeb (Stats, incCounter)
 
 import Network.Riak.Montage.Types
-import Data.Conduit.Pool (withResource)
+import Data.Pool (withResource)
 
 maxRetries :: Int
 maxRetries = 3
