@@ -69,7 +69,7 @@ pipelineGet state (ChainGet buck key Nothing) tracker actuallyRun = do
     opt <- eitherAnswerOrMandate
     mans <- case opt of
         Left tmv -> do
-            mans <- try $ runWithTimeout $ tracker actuallyRun
+            mans <- try $ tracker actuallyRun
             trackNamedSTM "non-pipelined" $ do
                 putTMVar tmv mans
                 hash <- readTVar (pipeline state)
@@ -96,7 +96,7 @@ pipelineGet state (ChainGet buck key Nothing) tracker actuallyRun = do
 
     hashkey = (buck, key)
 
-pipelineGet _ _ tracker actuallyRun = runWithTimeout $ tracker actuallyRun
+pipelineGet _ _ tracker actuallyRun = tracker actuallyRun
 
 runWithTimeout :: IO a -> IO a
 runWithTimeout action = do
@@ -114,7 +114,7 @@ trackConcurrency state maxRequests' action = do
     case mcount of
         Just count -> do
             logState count
-            finally action decrCount
+            finally (runWithTimeout action) decrCount
         Nothing -> error "concurrency limit hit"
   where
     maybeIncrCount = trackNamedSTM "maybeIncCount" $ do
