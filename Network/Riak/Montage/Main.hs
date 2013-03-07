@@ -43,6 +43,7 @@ cfg = Config {
    , statsPort = 3334
    , generator = generateRequest
    , maxRequests = 700
+   , requestTimeout = 30
    , readOnly = False
    , logCommands = False
   }
@@ -77,7 +78,7 @@ runDaemon cfg' pools = do
     let logging = logger cfg'
     let runOn = "tcp://*:" ++ show (proxyPort cfg')
 
-    void $ forkIO $ loggedSupervise logging "network-zeromq" $ serveMontageZmq (generator cfg') runOn state logging chooser' stats (maxRequests cfg') (readOnly cfg') (logCommands cfg')
+    void $ forkIO $ loggedSupervise logging "network-zeromq" $ serveMontageZmq (generator cfg') runOn state logging chooser' stats (maxRequests cfg') (requestTimeout cfg') (readOnly cfg') (logCommands cfg')
     void $ forkIO $ loggedSupervise logging "timekeeper" $ timeKeeper stats
     void $ forkIO $ runStats stats (statsPort cfg')
     sleepForever

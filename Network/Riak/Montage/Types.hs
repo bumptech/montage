@@ -146,6 +146,7 @@ data (MontageRiakValue a) => Config a = Config {
     , statsPort :: Int
     , generator :: (MontageEnvelope -> ChainCommand a)
     , maxRequests :: Int
+    , requestTimeout :: Int
     , readOnly :: Bool
     , logCommands :: Bool
   }

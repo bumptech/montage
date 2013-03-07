@@ -48,10 +48,6 @@ import qualified Network.Riak.Montage.Proto.Montage.MontageDelete as MD
 statsEvery :: Int
 statsEvery = 100
 
--- how long can a request run before railing?
-requestTimeout :: Int
-requestTimeout = 30 * 1000000 -- 30s
-
 data ConcurrentState = ConcurrentState {
       concurrentCount :: TVar Int
     , tick            :: TVar Int
@@ -63,13 +59,13 @@ newEmptyConcurrentState :: IO ConcurrentState
 newEmptyConcurrentState = ConcurrentState <$> newTVarIO 0 <*> newTVarIO 0 <*> newTVarIO 0 <*> newTVarIO HM.empty
 
 pipelineGet :: (MontageRiakValue t) => ConcurrentState -> ChainCommand t
-            -> (IO CommandResponse -> IO CommandResponse)
-            -> IO CommandResponse -> IO CommandResponse
-pipelineGet state (ChainGet buck key Nothing) tracker actuallyRun = do
+            -> (Int -> IO CommandResponse -> IO CommandResponse)
+            -> Int -> IO CommandResponse -> IO CommandResponse
+pipelineGet state (ChainGet buck key Nothing) tracker requestTimeout' actuallyRun = do
     opt <- eitherAnswerOrMandate
     mans <- case opt of
         Left tmv -> do
-            mans <- try $ tracker actuallyRun
+            mans <- try $ tracker requestTimeout' actuallyRun
             trackNamedSTM "non-pipelined" $ do
                 putTMVar tmv mans
                 hash <- readTVar (pipeline state)
@@ -78,7 +74,7 @@ pipelineGet state (ChainGet buck key Nothing) tracker actuallyRun = do
             return mans
         Right tmv -> do
             logError $ "(key request for " ++ (show buck) ++ "/" ++ (show key) ++ " is pipelined)"
-            runWithTimeout $ trackNamedSTM "pipelined" $ readTMVar tmv
+            runWithTimeout requestTimeout' $ trackNamedSTM "pipelined" $ readTMVar tmv
 
     case mans of
         Left (e::SomeException) -> throw e
@@ -96,25 +92,27 @@ pipelineGet state (ChainGet buck key Nothing) tracker actuallyRun = do
 
     hashkey = (buck, key)
 
-pipelineGet _ _ tracker actuallyRun = tracker actuallyRun
+pipelineGet _ _ tracker requestTimeout' actuallyRun = tracker requestTimeout' actuallyRun
 
-runWithTimeout :: IO a -> IO a
-runWithTimeout action = do
+runWithTimeout :: Int -> IO a -> IO a
+runWithTimeout requestTimeout' action = do
     mr <- timeout requestTimeout action
     case mr of
         Just r -> do
             return r
         Nothing -> do
             error "montage request timeout!"
+  where
+    requestTimeout = requestTimeout' * 1000000
 
-trackConcurrency :: ConcurrentState -> Int -> IO CommandResponse
+trackConcurrency :: ConcurrentState -> Int -> Int -> IO CommandResponse
                  -> IO CommandResponse
-trackConcurrency state maxRequests' action = do
+trackConcurrency state maxRequests' requestTimeout' action = do
     mcount <- maybeIncrCount
     case mcount of
         Just count -> do
             logState count
-            finally (runWithTimeout action) decrCount
+            finally (runWithTimeout requestTimeout' action) decrCount
         Nothing -> error "concurrency limit hit"
   where
     maybeIncrCount = trackNamedSTM "maybeIncCount" $ do
@@ -220,15 +218,15 @@ generateRequest (MontageEnvelope MONTAGE_ERROR _ _) = error "MONTAGE_ERROR is re
 generateRequest (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_DELETE_RESPONSE is reserved for responses from montage"
 generateRequest (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "DEPRICATED_MONTAGE_SET_REFERENCE is deprecated!"
 
-processRequest :: (MontageRiakValue r) => ConcurrentState -> PoolChooser -> ChainCommand r -> Stats -> Int -> Bool -> Bool -> IO CommandResponse
-processRequest state chooser' cmd stats maxRequests' readOnly' logCommands' = do
+processRequest :: (MontageRiakValue r) => ConcurrentState -> PoolChooser -> ChainCommand r -> Stats -> Int -> Int -> Bool -> Bool -> IO CommandResponse
+processRequest state chooser' cmd stats maxRequests' requestTimeout' readOnly' logCommands' = do
     when (readOnly' && (not $ isRead cmd)) $
       error "Non-read request issued to read-only montage"
 
     when (logCommands') $
       logError $ "Running command " ++ show cmd
 
-    pipelineGet state cmd tracker (processRequest' chooser' cmd stats)
+    pipelineGet state cmd tracker requestTimeout' (processRequest' chooser' cmd stats)
   where
     tracker = trackConcurrency state maxRequests'
 
