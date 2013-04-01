@@ -97,6 +97,7 @@ evalRiakResponse = fmap eval
 
 data (MontageRiakValue r) => ChainIteration r =
       IterationRiakCommand [RiakRequest r] ([RiakResponse r] -> ChainCommand r)
+    | IterationRiakCommandIO [RiakRequest r] ([RiakResponse r] -> IO (ChainCommand r))
     | IterationResponse CommandResponse
     | ChainIterationIO (IO (ChainCommand r))
 

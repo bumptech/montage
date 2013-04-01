@@ -238,6 +238,10 @@ processRequest' chooser' cmd stats = do
             rs <- runBackendCommands chooser' stats cmds
             let !cmd' = callback rs
             processRequest' chooser' cmd' stats
+        IterationRiakCommandIO cmds callback -> do
+            rs <- runBackendCommands chooser' stats cmds
+            !cmd' <- callback rs
+            processRequest' chooser' cmd' stats
         IterationResponse final -> return final
         ChainIterationIO ioCmd -> do
             cmd' <- ioCmd
