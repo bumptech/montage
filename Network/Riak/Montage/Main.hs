@@ -26,6 +26,7 @@ montageStats = [
   , "requests.slow"
   , "requests.many.siblings"
   , "requests.big"
+  , "requests.siblings"
   ]
 
 sleepForever :: IO a

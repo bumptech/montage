@@ -7,7 +7,7 @@ import Data.ByteString.Lazy as L
 import Network.Riak.Types
 import Network.Riak.Value.Resolvable (getWithLengthOpt, put, delete)
 
-import Network.StatsWeb (Stats, incCounter)
+import Network.StatsWeb (Stats, incCounter, incCounterBy)
 
 import Network.Riak.Montage.Types
 import Data.Pool (withResource)
@@ -41,6 +41,7 @@ doGet stats buck key chooser' opts' = doGet' $ chooser' buck
                 let resolvedLength = L.length $ riakSerialize resolved
                 when (siblings > 10) $ incCounter "requests.many.siblings" stats
                 when (resolvedLength > 1097152) $ incCounter "requests.big" stats
+                incCounterBy siblings "requests.siblings" stats
                 return $ Just (resolved, v, Just siblings)
             Nothing -> doGet' ps
     doGet' [] = return Nothing
