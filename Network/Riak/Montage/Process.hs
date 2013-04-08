@@ -21,6 +21,8 @@ import Text.ProtocolBuffers.Basic (toUtf8, utf8)
 import qualified Data.Text.Encoding as E
 import Data.Foldable (toList)
 import qualified Data.ListLike as LL
+import qualified Data.Text.Lazy as TL
+import Data.Text.Format
 
 import qualified Network.Riak.Value as V
 import qualified Network.Riak.Content as C
@@ -28,7 +30,7 @@ import qualified Network.Riak.Content as C
 import Network.Riak.Montage.Proto.Montage.MontageEnvelope as ME
 import Network.Riak.Montage.Proto.Montage.MontageWireMessages
 
-import Network.StatsWeb (Stats)
+import Network.StatsWeb (Stats, incCounter)
 
 import Network.Riak.Montage.Types
 import Network.Riak.Montage.Backend
@@ -218,6 +220,10 @@ generateRequest (MontageEnvelope MONTAGE_ERROR _ _) = error "MONTAGE_ERROR is re
 generateRequest (MontageEnvelope MONTAGE_DELETE_RESPONSE _ _) = error "MONTAGE_DELETE_RESPONSE is reserved for responses from montage"
 generateRequest (MontageEnvelope DEPRICATED_MONTAGE_SET_REFERENCE _ _) = error "DEPRICATED_MONTAGE_SET_REFERENCE is deprecated!"
 
+statsChainCustom :: (MontageRiakValue r) => ChainCommand r -> Stats -> IO ()
+statsChainCustom (ChainCustom cmd _) stats = incCounter (TL.toStrict $ format "requests.custom[type={}]" (Only cmd)) stats
+statsChainCustom _ _ = return ()
+
 processRequest :: (MontageRiakValue r) => ConcurrentState -> PoolChooser -> ChainCommand r -> Stats -> Int -> Int -> Bool -> Bool -> IO CommandResponse
 processRequest state chooser' cmd stats maxRequests' requestTimeout' readOnly' logCommands' = do
     when (readOnly' && (not $ isRead cmd)) $
@@ -232,6 +238,7 @@ processRequest state chooser' cmd stats maxRequests' requestTimeout' readOnly' l
 
 processRequest' :: (MontageRiakValue r) => PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
 processRequest' chooser' cmd stats = do
+    statsChainCustom cmd stats
     let !step = exec cmd
     case step of
         IterationRiakCommand cmds callback -> do

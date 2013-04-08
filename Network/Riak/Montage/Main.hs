@@ -18,16 +18,15 @@ import Network.Riak.Montage.Types
 import Network.Riak.Montage.Util
 
 
--- | Stats broadcast to localhost, port 3344
-montageStats :: [T.Text]
-montageStats = [
-    "pulse"
-  , "requests"
-  , "requests.slow"
-  , "requests.many.siblings"
-  , "requests.big"
-  , "requests.siblings"
-  ]
+{- Stats broadcast to localhost, port 3344
+"pulse"
+"requests"
+"requests.slow"
+"requests.many.siblings"
+"requests.big"
+"requests.siblings[bucket={}]" (bucket from put)
+"requests.custom[type={}]" (custom command handler Text)
+-}
 
 sleepForever :: IO a
 sleepForever = forever $ threadDelay (1000000 * 3600)
@@ -71,7 +70,6 @@ runDaemon cfg' pools = do
     hSetBuffering stderr LineBuffering
 
     stats <- initStats (statsPrefix cfg')
-    mapM_ (addCounter stats) montageStats
 
     state <- newEmptyConcurrentState
 

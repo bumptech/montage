@@ -4,6 +4,7 @@ import Control.Monad (void, when)
 import Control.Exception (catch, throw, SomeException(..))
 import Control.Concurrent (threadDelay)
 import Data.ByteString.Lazy as L
+import Data.ByteString as S
 import Network.Riak.Types
 import Network.Riak.Value.Resolvable (getWithLengthOpt, put, delete)
 
@@ -11,6 +12,10 @@ import Network.StatsWeb (Stats, incCounter, incCounterBy)
 
 import Network.Riak.Montage.Types
 import Data.Pool (withResource)
+
+import Data.Text.Format
+import Data.Text.Lazy as TL
+import Data.Text.Lazy.Encoding as E
 
 maxRetries :: Int
 maxRetries = 3
@@ -41,7 +46,7 @@ doGet stats buck key chooser' opts' = doGet' $ chooser' buck
                 let resolvedLength = L.length $ riakSerialize resolved
                 when (siblings > 10) $ incCounter "requests.many.siblings" stats
                 when (resolvedLength > 1097152) $ incCounter "requests.big" stats
-                incCounterBy siblings "requests.siblings" stats
+                incCounterBy siblings (TL.toStrict $ format "requests.siblings[bucket={}]" $ (Only $ E.decodeUtf8 buck)) stats
                 return $ Just (resolved, v, Just siblings)
             Nothing -> doGet' ps
     doGet' [] = return Nothing
