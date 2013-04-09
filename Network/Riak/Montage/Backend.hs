@@ -4,7 +4,6 @@ import Control.Monad (void, when)
 import Control.Exception (catch, throw, SomeException(..))
 import Control.Concurrent (threadDelay)
 import Data.ByteString.Lazy as L
-import Data.ByteString as S
 import Network.Riak.Types
 import Network.Riak.Value.Resolvable (getWithLengthOpt, put, delete)
 
