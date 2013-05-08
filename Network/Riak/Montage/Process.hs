@@ -3,18 +3,10 @@ module Network.Riak.Montage.Process where
 import Control.Monad (void, when)
 import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (newEmptyMVar, takeMVar, putMVar, MVar)
-import Control.Concurrent.STM (newTVarIO)
-import Control.Concurrent.STM.TVar (readTVar, writeTVar, TVar)
-import Control.Concurrent.STM.TMVar (newEmptyTMVar, readTMVar, putTMVar, TMVar)
-import Control.Concurrent.STM.Stats (trackNamedSTM)
-import Control.Exception (finally, try, throw, SomeException)
+import Control.Exception (try, throw, SomeException)
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 import System.Timeout (timeout)
-import Data.Time.Clock.POSIX (getPOSIXTime)
 import Data.Maybe (fromJust)
-
-import qualified Data.HashMap.Strict as HM
-import Control.Applicative
 
 import qualified Network.Riak.Types as RT
 import Text.ProtocolBuffers.Basic (toUtf8, utf8)
@@ -46,56 +38,6 @@ import qualified Network.Riak.Montage.Proto.Montage.MontageCommand as MC
 import qualified Network.Riak.Montage.Proto.Montage.MontageCommandResponse as MCR
 import qualified Network.Riak.Montage.Proto.Montage.MontageDelete as MD
 
--- how many requests before printing stats?
-statsEvery :: Int
-statsEvery = 100
-
-data ConcurrentState = ConcurrentState {
-      concurrentCount :: TVar Int
-    , tick            :: TVar Int
-    , ts              :: TVar Double
-    , pipeline        :: TVar (HM.HashMap (RT.Bucket, RT.Key) (TMVar (Either SomeException CommandResponse)))
-    }
-
-newEmptyConcurrentState :: IO ConcurrentState
-newEmptyConcurrentState = ConcurrentState <$> newTVarIO 0 <*> newTVarIO 0 <*> newTVarIO 0 <*> newTVarIO HM.empty
-
-pipelineGet :: (MontageRiakValue t) => ConcurrentState -> ChainCommand t
-            -> (Int -> IO CommandResponse -> IO CommandResponse)
-            -> Int -> IO CommandResponse -> IO CommandResponse
-pipelineGet state (ChainGet buck key Nothing) tracker requestTimeout' actuallyRun = do
-    opt <- eitherAnswerOrMandate
-    mans <- case opt of
-        Left tmv -> do
-            mans <- try $ tracker requestTimeout' actuallyRun
-            trackNamedSTM "non-pipelined" $ do
-                putTMVar tmv mans
-                hash <- readTVar (pipeline state)
-                let hash' = HM.delete hashkey hash
-                writeTVar (pipeline state) hash'
-            return mans
-        Right tmv -> do
-            logError $ "(key request for " ++ (show buck) ++ "/" ++ (show key) ++ " is pipelined)"
-            runWithTimeout requestTimeout' $ trackNamedSTM "pipelined" $ readTMVar tmv
-
-    case mans of
-        Left (e::SomeException) -> throw e
-        Right ans -> return ans
-  where
-    eitherAnswerOrMandate = trackNamedSTM "eitherAnswerOrMandate" $ do
-        hash <- readTVar (pipeline state)
-        case HM.lookup hashkey hash of
-            Just tmv -> return $ Right tmv
-            Nothing -> do
-                newTmv <- newEmptyTMVar
-                let hash' = HM.insert hashkey newTmv hash
-                writeTVar (pipeline state) hash'
-                return $ Left newTmv
-
-    hashkey = (buck, key)
-
-pipelineGet _ _ tracker requestTimeout' actuallyRun = tracker requestTimeout' actuallyRun
-
 runWithTimeout :: Int -> IO a -> IO a
 runWithTimeout requestTimeout' action = do
     mr <- timeout requestTimeout action
@@ -106,45 +48,6 @@ runWithTimeout requestTimeout' action = do
             error "montage request timeout!"
   where
     requestTimeout = requestTimeout' * 1000000
-
-trackConcurrency :: ConcurrentState -> Int -> Int -> IO CommandResponse
-                 -> IO CommandResponse
-trackConcurrency state maxRequests' requestTimeout' action = do
-    mcount <- maybeIncrCount
-    case mcount of
-        Just count -> do
-            logState count
-            finally (runWithTimeout requestTimeout' action) decrCount
-        Nothing -> error "concurrency limit hit"
-  where
-    maybeIncrCount = trackNamedSTM "maybeIncCount" $ do
-        count <- readTVar (concurrentCount state)
-        if (count < maxRequests')
-        then (writeTVar (concurrentCount state) (count + 1) >> return (Just $ count + 1))
-        else (return Nothing)
-
-    decrCount = trackNamedSTM "decrCount" $ do
-        count <- readTVar (concurrentCount state)
-        writeTVar (concurrentCount state) $ count - 1
-
-    logState count = do
-        now <- fmap realToFrac getPOSIXTime
-        mlog <- trackNamedSTM "logState" $ do
-            tick' <- fmap (+1) $ readTVar (tick state)
-            writeTVar (tick state) tick'
-            if tick' `mod` statsEvery == 0
-            then do
-                last' <- readTVar (ts state)
-                writeTVar (ts state) now
-                return (Just last')
-            else (return Nothing)
-        case mlog of
-            Just last' -> do
-                let speed = (fromIntegral statsEvery) / (now - last') -- should never be /0
-                logError ("{stats} concurrency=" ++ (show count)
-                    ++ " rate=" ++ (show speed))
-                --dumpSTMStats
-            Nothing -> return ()
 
 fromRight :: Either a b -> b
 fromRight (Right x) = x
@@ -224,17 +127,15 @@ statsChainCustom :: (MontageRiakValue r) => ChainCommand r -> Stats -> IO ()
 statsChainCustom (ChainCustom cmd _) stats = incCounter (TL.toStrict $ format "requests.custom[type={}]" (Only cmd)) stats
 statsChainCustom _ _ = return ()
 
-processRequest :: (MontageRiakValue r) => ConcurrentState -> PoolChooser -> ChainCommand r -> Stats -> Int -> Int -> Bool -> Bool -> IO CommandResponse
-processRequest state chooser' cmd stats maxRequests' requestTimeout' readOnly' logCommands' = do
+processRequest :: (MontageRiakValue r) => PoolChooser -> ChainCommand r -> Stats -> Int -> Bool -> Bool -> IO CommandResponse
+processRequest chooser' cmd stats requestTimeout' readOnly' logCommands' = do
     when (readOnly' && (not $ isRead cmd)) $
       error "Non-read request issued to read-only montage"
 
     when (logCommands') $
       logError $ "Running command " ++ show cmd
 
-    pipelineGet state cmd tracker requestTimeout' (processRequest' chooser' cmd stats)
-  where
-    tracker = trackConcurrency state maxRequests'
+    runWithTimeout requestTimeout' (processRequest' chooser' cmd stats)
 
 processRequest' :: (MontageRiakValue r) => PoolChooser -> ChainCommand r -> Stats -> IO CommandResponse
 processRequest' chooser' cmd stats = do

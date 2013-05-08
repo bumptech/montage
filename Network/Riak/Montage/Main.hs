@@ -3,6 +3,7 @@ module Network.Riak.Montage.Main where
 import System.IO (hSetBuffering, BufferMode(..), stdout, stderr)
 import Control.Monad (forever, void)
 import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (newEmptyMVar)
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy.Char8 as B
 
@@ -13,7 +14,7 @@ import Network.Riak (defaultClient, connect, disconnect,
                     Client(port), Connection)
 
 import Network.Riak.Montage.Protocol
-import Network.Riak.Montage.Process (newEmptyConcurrentState, generateRequest)
+import Network.Riak.Montage.Process (generateRequest)
 import Network.Riak.Montage.Types
 import Network.Riak.Montage.Util
 
@@ -71,16 +72,24 @@ runDaemon cfg' pools = do
 
     stats <- initStats (statsPrefix cfg')
 
-    state <- newEmptyConcurrentState
+    q <- newEmptyMVar
 
     let chooser' = chooser pools
     let logging = logger cfg'
     let runOn = "tcp://*:" ++ show (proxyPort cfg')
 
-    void $ forkIO $ loggedSupervise logging "network-zeromq" $ serveMontageZmq (generator cfg') runOn state logging chooser' stats (maxRequests cfg') (requestTimeout cfg') (readOnly cfg') (logCommands cfg')
+    let loop = processLoop q (generator cfg') logging chooser' stats (requestTimeout cfg') (readOnly cfg') (logCommands cfg')
+    mapM_ (makeChild loop) [0..15] -- 15 threads temp
+
+    void $ forkIO $ loggedSupervise logging "network-zeromq" $ serveMontageZmq q runOn
     void $ forkIO $ loggedSupervise logging "timekeeper" $ timeKeeper stats
     void $ forkIO $ runStats stats (statsPort cfg')
     sleepForever
+
+makeChild :: IO () -> Int -> IO ()
+makeChild loop n = void $ forkIO $ loggedSupervise log label $ loop
+    where
+        label = "node-" ++ show n
 
 timeKeeper :: Stats -> IO a
 timeKeeper stats = forever $ do
