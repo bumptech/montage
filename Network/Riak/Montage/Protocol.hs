@@ -4,7 +4,7 @@ import System.ZMQ
 import System.UUID.V4 (uuid)
 import Control.Monad (forever)
 import Control.Concurrent (forkIO)
-import Control.Concurrent.MVar (takeMVar, putMVar)
+import Control.Concurrent.MVar (MVar, newMVar, takeMVar, putMVar)
 import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.ByteString.Lazy as BW
 import qualified Data.ByteString.Char8 as S
@@ -12,6 +12,7 @@ import Control.Exception (try, SomeException)
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 import Text.ProtocolBuffers.Basic (uFromString)
 import Data.Aeson (object, (.=))
+import Data.Maybe (fromJust)
 
 import Network.Riak.Montage.Util
 
@@ -24,8 +25,7 @@ import Network.Riak.Montage.Types
 import Network.Riak.Montage.Process (processRequest,
                                     serializeResponse)
 
---temp
-import qualified Bump.LRUCache.IO as LRU
+import qualified LRUStrict.IO as LRU
 
 
 type ZmqHandler = (S.ByteString -> ZmqCallback -> IO ())
@@ -76,7 +76,7 @@ zmqRpcReply c inproc retid out = do
         send s retid []
         )
 
-serveMontageZmq :: (MontageRiakValue r) => MVar (S.ByteString, Maybe [ZmqCallback]) -> String -> IO ()
+serveMontageZmq :: MVar (S.ByteString, MVar (Maybe [ZmqCallback])) -> String -> IO ()
 serveMontageZmq queueAny runOn = do
     current <- LRU.newLRU 1000
     runZmqRpc runOn (serveMontage queueAny current)
@@ -91,20 +91,20 @@ serveMontage queueAny current m cb = do
         pipestate <- takeMVar pipe
         case pipestate of
             Just ps -> putMVar pipe $ Just (cb:ps)
-            Nothing -> routeToAnyone m current
+            Nothing -> routeToAnyone cb m
 
     routeToAnyone cb m = do
         pipe <- newMVar (Just [cb])
         LRU.insert current m pipe
         putMVar queueAny (m,pipe)
 
-processLoop queueAny generate runOn logCB chooser' stats requestTimeout' readOnly' logCommands' = do
+processLoop queueAny generate logCB chooser' stats requestTimeout' readOnly' logCommands' = do
     forever $ do
         (item, pipe) <- takeMVar queueAny
         pipe' <- takeMVar pipe
         putMVar pipe Nothing
         m <- wrapMontage item
-        mapM_ (\cb -> cb m) pipe'
+        mapM_ (\cb -> cb m) $ fromJust pipe'
   where
     wrapMontage m = do
         case messageGet $ sTl m of

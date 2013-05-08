@@ -79,15 +79,14 @@ runDaemon cfg' pools = do
     let runOn = "tcp://*:" ++ show (proxyPort cfg')
 
     let loop = processLoop q (generator cfg') logging chooser' stats (requestTimeout cfg') (readOnly cfg') (logCommands cfg')
-    mapM_ (makeChild loop) [0..15] -- 15 threads temp
+    mapM_ (makeChild logging loop) [0..15] -- 15 threads temp
 
     void $ forkIO $ loggedSupervise logging "network-zeromq" $ serveMontageZmq q runOn
     void $ forkIO $ loggedSupervise logging "timekeeper" $ timeKeeper stats
     void $ forkIO $ runStats stats (statsPort cfg')
     sleepForever
 
-makeChild :: IO () -> Int -> IO ()
-makeChild loop n = void $ forkIO $ loggedSupervise log label $ loop
+makeChild log loop n = void $ forkIO $ loggedSupervise log label $ loop
     where
         label = "node-" ++ show n
 
