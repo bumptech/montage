@@ -44,7 +44,9 @@ doGet stats buck key chooser' opts' = doGet' $ chooser' buck
             Just ((resolved, siblings), v) -> do
                 let resolvedLength = L.length $ riakSerialize resolved
                 when (siblings > 10) $ incCounter "requests.many.siblings" stats
-                when (resolvedLength > 1097152) $ incCounter "requests.big" stats
+                when (resolvedLength > 1048576) $ do
+                     incCounter (TL.toStrict $ format "requests.big[bucket={}][threshold=1048576]" $ (Only $ E.decodeUtf8 buck)) stats
+                     when (resolvedLength > 2097152) $ incCounter (TL.toStrict $ format "requests.big[bucket={}][threshold=2097152]" $ (Only $ E.decodeUtf8 buck)) stats
                 when (siblings > 1) $ incCounterBy (siblings-1) (TL.toStrict $ format "requests.siblings[bucket={}]" $ (Only $ E.decodeUtf8 buck)) stats
                 return $ Just (resolved, v, Just siblings)
             Nothing -> doGet' ps
