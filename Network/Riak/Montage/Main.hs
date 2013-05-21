@@ -50,17 +50,18 @@ cfg = Config {
 
 -- | Create a pool of Riak connection (usually used for constructing the second argument of @runDaemon@), given a port and a max number of connections.
 riakPoolOnPort :: String -> Int -> IO (Pool Connection)
-riakPoolOnPort port' count = riakPoolOnPort' port' count 0
+riakPoolOnPort port' count = riakPoolOnPort' port' count 0 0
 
 -- | Use tracking as the number of seconds delay before calculating pool resource and stm stats.  Stats written to stderr.
-riakPoolOnPort' :: String -> Int -> Int -> IO (Pool Connection)
-riakPoolOnPort' port' count tracking =
+riakPoolOnPort' :: String -> Int -> Int -> Int -> IO (Pool Connection)
+riakPoolOnPort' port' count tracking maxUses =
     createPool'
         (connect $ defaultClient {port = port'})
         disconnect
         1  -- stripes
         10 -- timeout
         tracking -- tracking turned on if non zero
+        maxUses -- max times to reuse a connection
         count -- max connections
 
 -- | Start the resolution proxy, where you define resolutions for your data @a@, and create one or more Riak connection pools @p@.

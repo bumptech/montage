@@ -1,7 +1,7 @@
 module Network.Riak.Montage.Backend where
 
 import Control.Monad (void, when)
-import Control.Exception (catch, throw, SomeException(..))
+import Control.Exception (catch, throw, try, SomeException(..))
 import Control.Concurrent (threadDelay)
 import Data.ByteString.Lazy as L
 import Network.Riak.Types
@@ -21,14 +21,20 @@ maxRetries = 3
 
 -- We can't actually put in the type signatures below, see
 -- http://www.haskell.org/haskellwiki/Type_families#Injectivity.2C_type_inference.2C_and_ambiguity
-retryOperation :: IO a -> IO a
+retryOperation :: IO (Either SomeException a) -> IO a
 retryOperation op =
     retryOperation' 0
   where
-    --retryOperation' :: IO a -> Int -> IO a
-    retryOperation' retries = catch op (handleError retries)
+    --retryOperation' :: IO (Either SomeException a) -> Int -> IO a
+    retryOperation' retries = do
+        res <- try op
+        case res of
+            Left (e :: SomeException) -> handleError retries e
+            Right res' -> case res' of
+                Left (e :: SomeException) -> handleError retries e
+                Right r -> return r
 
-    --handleError :: (Exception e) => Int -> e -> IO a
+    --handleError :: (Exception e) => Int -> e -> IO (Either SomeException a)
     handleError retries e = case retries > maxRetries of
         True -> throw (e :: SomeException)
         False -> do
