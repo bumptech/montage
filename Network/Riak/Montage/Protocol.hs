@@ -1,8 +1,8 @@
 module Network.Riak.Montage.Protocol where
 
-import System.ZMQ
+import System.Nitro
 import System.UUID.V4 (uuid)
-import Control.Monad (forever)
+import Control.Monad (forever, void)
 import Control.Concurrent (forkIO)
 import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.ByteString.Lazy as BW
@@ -24,59 +24,33 @@ import Network.Riak.Montage.Process (processRequest,
                                     serializeResponse, ConcurrentState(..))
 
 
-type ZmqHandler = (S.ByteString -> (BW.ByteString -> IO ()) -> IO ())
+type Handler = (S.ByteString -> (S.ByteString -> IO ()) -> IO ())
 
-runZmqRpc :: String
-          -> ZmqHandler
-          -> IO ()
-runZmqRpc bindSpec call = do
-    withContext 1 (\c ->
-        runZmqRpcWithContext c bindSpec call)
-
-runZmqRpcWithContext :: Context
-                     -> String
-                     -> ZmqHandler
-                     -> IO ()
-runZmqRpcWithContext ctx binda call = do
-    withSocket ctx Router (\s -> do
-        rand <- uuid
-        let inproc = "inproc://" ++ (show rand)
-        bind s binda
-        bind s inproc
-        forever $ do
-            zid <- receive s []
-            _ <- receive s []
-            m <- receive s []
-            more <- moreToReceive s
-            if more
-            then do  -- forward
-                fwid <- receive s []
-                send s fwid [SndMore]
-                send s "" [SndMore]
-                send s m []
-            else do -- call
-                _ <- forkIO $ call m (zmqRpcReply ctx inproc zid)
-                return ()
-        )
-
-zmqRpcReply :: Context
-            -> String        -- inproc
-            -> S.ByteString  -- sent id
-            -> BW.ByteString  -- out message
+runNitroRpc :: String
+            -> Handler
             -> IO ()
-zmqRpcReply c inproc retid out = do
-    withSocket c Req (\s -> do
-        connect s inproc
-        send' s out [SndMore]
-        send s retid []
-        )
+runNitroRpc binda call =
+    withSocket (bind binda defaultOpts)
+               (\s -> forever $ do
+                   (m,fr) <- recvFrame s []
+                   void $ forkIO $ call m (nitroCallback s fr)
+               )
 
-serveMontageZmq :: (MontageRiakValue r) =>
+nitroCallback :: NitroSocket
+              -> NitroFrame
+              -> S.ByteString
+              -> IO ()
+nitroCallback s fr out = do
+    frBack <- bstrToFrame out
+    reply s fr frBack []
+
+serveMontage :: (MontageRiakValue r) =>
                    (MontageEnvelope -> ChainCommand r) ->
                    String -> ConcurrentState -> LogCallback ->
                    PoolChooser -> Stats -> Int -> Int -> Bool -> Bool -> IO ()
-serveMontageZmq generate runOn state logCB chooser' stats maxRequests' requestTimeout' readOnly' logCommands' = do
-    runZmqRpc runOn wrapMontage
+serveMontage generate runOn state logCB chooser' stats maxRequests' requestTimeout' readOnly' logCommands' = do
+    nitroRuntimeStart
+    runNitroRpc runOn wrapMontage
   where
     wrapMontage m cb = do
         case messageGet $ sTl m of
@@ -86,14 +60,14 @@ serveMontageZmq generate runOn state logCB chooser' stats maxRequests' requestTi
                     fmap (serializeResponse env) $ processRequest state chooser' cmd stats maxRequests' requestTimeout' readOnly' logCommands'
                 case res of
                     Left (e :: SomeException) -> returnError (show e) $ msgid env
-                    Right outenv -> cb $  messagePut outenv
+                    Right outenv -> cb . lTs . messagePut $ outenv
 
             _ -> returnError "Failed to decode MontageEnvelope" Nothing
       where
         returnError err msgid' = do
             logError err
             logCB "EXCEPTION" Nothing $ object ["error" .=  err ]
-            cb $ messagePut $ MontageEnvelope {
+            cb . lTs . messagePut $ MontageEnvelope {
                   mtype = MONTAGE_ERROR
                 , msg = messagePut $ MontageError (uFromString err)
                 , msgid = msgid'
