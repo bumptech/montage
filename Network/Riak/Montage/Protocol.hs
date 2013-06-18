@@ -32,7 +32,8 @@ runNitroRpc :: String
 runNitroRpc binda call =
     withSocket (bind binda defaultOpts)
                (\s -> forever $ do
-                   (m,fr) <- recvFrame s []
+                   fr <- recv s []
+                   m <- frameToBstr fr
                    void $ forkIO $ call m (nitroCallback s fr)
                )
 
