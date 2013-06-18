@@ -59,7 +59,7 @@ Library
                   safe,
                   stm-stats,
                   text-format,
-                  nitro==0.2.1.0
+                  nitro==0.2.2.0
 
   Extensions: OverloadedStrings,DeriveDataTypeable
   Extensions: FlexibleInstances,DoAndIfThenElse,ScopedTypeVariables
