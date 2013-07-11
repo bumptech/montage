@@ -1,5 +1,5 @@
 Name:                montage
-Version:             0.3.4
+Version:             0.3.5
 Synopsis:            Riak Resolution Proxy
 Homepage:            http://github.com/bumptech/montage
 License:             BSD3
@@ -59,7 +59,7 @@ Library
                   safe,
                   stm-stats,
                   text-format,
-                  nitro==0.2.2.4
+                  nitro==0.2.2.5
 
   Extensions: OverloadedStrings,DeriveDataTypeable
   Extensions: FlexibleInstances,DoAndIfThenElse,ScopedTypeVariables
