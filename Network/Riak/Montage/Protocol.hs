@@ -7,7 +7,7 @@ import Control.Concurrent (forkIO)
 import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.ByteString.Lazy as BW
 import qualified Data.ByteString.Char8 as S
-import Control.Exception (try, SomeException)
+import Control.Exception (try, SomeException, throw)
 import Text.ProtocolBuffers.WireMessage (messageGet, messagePut)
 import Text.ProtocolBuffers.Basic (uFromString)
 import Data.Aeson (object, (.=))
@@ -42,8 +42,17 @@ nitroCallback :: NitroSocket
               -> S.ByteString
               -> IO ()
 nitroCallback s fr out = do
-    frBack <- bstrToFrame out
-    reply s fr frBack []
+    res <- try wrapCallback
+    case res of
+        Left (e :: SomeException) ->
+          if show e == moveon then logError moveon else throw e
+        Right _ -> return ()
+  where
+    moveon = "specified frame recipient not found in socket table"
+
+    wrapCallback = do
+      frBack <- bstrToFrame out
+      reply s fr frBack []
 
 serveMontage :: (MontageRiakValue r) =>
                    (MontageEnvelope -> ChainCommand r) ->
